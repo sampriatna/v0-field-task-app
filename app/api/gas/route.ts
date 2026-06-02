@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession, isAuthenticated } from "@/lib/auth";
 
+// Reload trigger: env var updated
+
 // Actions that require admin authentication
 const ADMIN_ACTIONS = [
   "createTask",
