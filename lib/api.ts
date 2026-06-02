@@ -57,14 +57,21 @@ async function callApi<T>(
       return { success: false, error: "Sesi telah berakhir. Silakan login kembali." };
     }
 
-    const data = await response.json();
+    const result = await response.json();
     
-    // Check for GAS_NOT_CONFIGURED error
-    if (data.error === "GAS_NOT_CONFIGURED") {
+    // GAS returns { success, data, message, error }
+    // We pass it through directly since it matches our ApiResponse structure
+    if (result.error === "GAS_NOT_CONFIGURED") {
       return { success: false, error: "GAS_NOT_CONFIGURED" };
     }
 
-    return { success: true, data };
+    // Check for GAS errors
+    if (!result.success && result.error) {
+      return { success: false, error: result.error };
+    }
+
+    // Return the GAS response directly - data is already in the right place
+    return { success: result.success, data: result.data as T };
   } catch (error) {
     console.error("API Error:", error);
     return {

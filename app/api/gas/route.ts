@@ -39,6 +39,9 @@ const ADMIN_ACTIONS = [
   "updateStaff",
   "deleteStaff",
   "getStaff",
+  "getChecklistTemplate",
+  "saveChecklistTemplate",
+  "generateRecurringTasks",
 ];
 
 // Actions that are public (staff report pages)
@@ -101,12 +104,41 @@ async function forwardToGas(
       });
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    // Get response text first to handle non-JSON responses
+    const responseText = await response.text();
+    
+    // Try to parse as JSON
+    try {
+      const data = JSON.parse(responseText);
+      return NextResponse.json(data);
+    } catch {
+      // Response is not valid JSON
+      console.error("GAS returned non-JSON response:", responseText.substring(0, 500));
+      
+      // Check for common GAS error patterns
+      if (responseText.includes("Script function not found")) {
+        return NextResponse.json(
+          { success: false, error: `Action "${action}" tidak ditemukan di GAS` },
+          { status: 400 }
+        );
+      }
+      
+      if (responseText.includes("ADMIN_SECRET_INVALID")) {
+        return NextResponse.json(
+          { success: false, error: "Admin API key tidak valid" },
+          { status: 401 }
+        );
+      }
+      
+      return NextResponse.json(
+        { success: false, error: "Server mengembalikan response tidak valid. Cek GAS logs." },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error("GAS API Error:", error);
     return NextResponse.json(
-      { success: false, error: "Gagal menghubungi server" },
+      { success: false, error: "Gagal menghubungi server GAS" },
       { status: 500 }
     );
   }

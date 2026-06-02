@@ -103,9 +103,6 @@ export function validateAdminPassword(password: string): boolean {
     console.error("ADMIN_PASSWORD environment variable is not set");
     return false;
   }
-
-  console.log("[v0] Password validation - input length:", password.length, "expected length:", adminPassword.length);
-  console.log("[v0] Match result:", password === adminPassword);
   
   return password === adminPassword;
 }
