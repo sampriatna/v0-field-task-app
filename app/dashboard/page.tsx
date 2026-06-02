@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight } from "lucide-react";
+import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { getTasks, getChecklistReports } from "@/lib/api";
 import type { Task, DashboardSummary, TaskStatus, Outlet, ChecklistReport, ChecklistSummary } from "@/lib/types";
@@ -117,38 +117,46 @@ export default function DashboardPage() {
   const loadData = async () => {
     setIsLoading(true);
     setLoadError(null);
+    console.log("[v0] Dashboard: Starting to load data...");
     
     try {
       // Load tasks with 15 second timeout
+      console.log("[v0] Dashboard: Calling getTasks()...");
       const tasksResult = await withTimeout(getTasks(), 15000);
+      console.log("[v0] Dashboard: getTasks() returned:", tasksResult.success ? "success" : "error", tasksResult.error || "");
       
       if (tasksResult.success && tasksResult.data) {
+        console.log("[v0] Dashboard: Tasks loaded, count:", tasksResult.data.length);
         setTasks(tasksResult.data);
         setSummary(calculateTaskSummary(tasksResult.data));
         setChecklistSummary(calculateChecklistSummary(tasksResult.data));
       } else {
         // If tasks fail, still show empty dashboard
+        console.log("[v0] Dashboard: Tasks failed, showing error");
         setTasks([]);
         setLoadError(tasksResult.error || "Gagal memuat tugas");
       }
       
       // Load checklists separately (non-blocking)
       try {
+        console.log("[v0] Dashboard: Calling getChecklistReports()...");
         const checklistsResult = await withTimeout(getChecklistReports(), 10000);
         if (checklistsResult.success && checklistsResult.data) {
+          console.log("[v0] Dashboard: Checklists loaded, count:", checklistsResult.data.length);
           setChecklists(checklistsResult.data);
         }
-      } catch {
+      } catch (error) {
         // Checklist error is non-fatal
-        console.error("Failed to load checklists");
+        console.log("[v0] Dashboard: Checklists failed (non-blocking):", error);
       }
     } catch (error) {
-      console.error("Failed to load dashboard:", error);
+      console.error("[v0] Dashboard: Failed to load dashboard:", error);
       setLoadError(error instanceof Error ? error.message : "Gagal memuat data");
       // Still show empty dashboard instead of crashing
       setTasks([]);
     } finally {
       setIsLoading(false);
+      console.log("[v0] Dashboard: Finished loading");
     }
   };
 
@@ -197,6 +205,25 @@ export default function DashboardPage() {
       <MobileHeader title="Dashboard" showSettings />
 
       <div className="p-4 space-y-4 max-w-5xl mx-auto">
+        {/* Error Alert */}
+        {loadError && tasks.length > 0 && (
+          <Card className="bg-red-50 border-red-200">
+            <CardContent className="p-4 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-red-800">{loadError}</p>
+                <Button 
+                  variant="link" 
+                  size="sm"
+                  onClick={() => loadData()}
+                  className="text-red-600 p-0 h-auto"
+                >
+                  Coba muat ulang
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-3">
           <Link href="/recurring">
