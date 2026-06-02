@@ -102,25 +102,51 @@ export default function DashboardPage() {
     };
   };
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Timeout wrapper for API calls
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout")), ms)
+      ),
+    ]);
+  };
+
   const loadData = async () => {
     setIsLoading(true);
+    setLoadError(null);
+    
     try {
-      const [tasksResult, checklistsResult] = await Promise.all([
-        getTasks(),
-        getChecklistReports(),
-      ]);
-
+      // Load tasks with 15 second timeout
+      const tasksResult = await withTimeout(getTasks(), 15000);
+      
       if (tasksResult.success && tasksResult.data) {
         setTasks(tasksResult.data);
-        // Calculate summary from actual tasks data
         setSummary(calculateTaskSummary(tasksResult.data));
         setChecklistSummary(calculateChecklistSummary(tasksResult.data));
+      } else {
+        // If tasks fail, still show empty dashboard
+        setTasks([]);
+        setLoadError(tasksResult.error || "Gagal memuat tugas");
       }
-      if (checklistsResult.success && checklistsResult.data) {
-        setChecklists(checklistsResult.data);
+      
+      // Load checklists separately (non-blocking)
+      try {
+        const checklistsResult = await withTimeout(getChecklistReports(), 10000);
+        if (checklistsResult.success && checklistsResult.data) {
+          setChecklists(checklistsResult.data);
+        }
+      } catch {
+        // Checklist error is non-fatal
+        console.error("Failed to load checklists");
       }
     } catch (error) {
-      console.error("Failed to load data:", error);
+      console.error("Failed to load dashboard:", error);
+      setLoadError(error instanceof Error ? error.message : "Gagal memuat data");
+      // Still show empty dashboard instead of crashing
+      setTasks([]);
     } finally {
       setIsLoading(false);
     }
