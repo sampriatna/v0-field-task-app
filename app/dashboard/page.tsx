@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { MobileHeader } from "@/components/mobile-header";
-import { DashboardSummaryCards } from "@/components/dashboard-summary";
+import { DashboardSummaryCards, ChecklistSummaryCards } from "@/components/dashboard-summary";
 import { TaskCard, TaskCardSkeleton } from "@/components/task-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -13,11 +15,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Filter, X } from "lucide-react";
+import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { getTasks, getDashboardSummary } from "@/lib/api";
-import type { Task, DashboardSummary, TaskStatus, Outlet } from "@/lib/types";
+import { getTasks, getDashboardSummary, getChecklistReports, getChecklistSummary } from "@/lib/api";
+import type { Task, DashboardSummary, TaskStatus, Outlet, ChecklistReport, ChecklistSummary } from "@/lib/types";
 import { outlets } from "@/lib/mock-data";
+import { StatusBadge } from "@/components/status-badge";
 
 const statusOptions: { value: TaskStatus | "ALL"; label: string }[] = [
   { value: "ALL", label: "Semua Status" },
@@ -30,7 +33,16 @@ const statusOptions: { value: TaskStatus | "ALL"; label: string }[] = [
 
 export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [checklists, setChecklists] = useState<ChecklistReport[]>([]);
   const [summary, setSummary] = useState<DashboardSummary>({
+    total: 0,
+    open: 0,
+    submitted: 0,
+    done: 0,
+    late: 0,
+    revisi: 0,
+  });
+  const [checklistSummary, setChecklistSummary] = useState<ChecklistSummary>({
     total: 0,
     open: 0,
     submitted: 0,
@@ -40,6 +52,7 @@ export default function DashboardPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [activeTab, setActiveTab] = useState<"tasks" | "checklists">("tasks");
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
@@ -53,9 +66,11 @@ export default function DashboardPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [tasksResult, summaryResult] = await Promise.all([
+      const [tasksResult, summaryResult, checklistsResult, checklistSummaryResult] = await Promise.all([
         getTasks(),
         getDashboardSummary(),
+        getChecklistReports(),
+        getChecklistSummary(),
       ]);
 
       if (tasksResult.success && tasksResult.data) {
@@ -63,6 +78,12 @@ export default function DashboardPage() {
       }
       if (summaryResult.success && summaryResult.data) {
         setSummary(summaryResult.data);
+      }
+      if (checklistsResult.success && checklistsResult.data) {
+        setChecklists(checklistsResult.data);
+      }
+      if (checklistSummaryResult.success && checklistSummaryResult.data) {
+        setChecklistSummary(checklistSummaryResult.data);
       }
     } catch (error) {
       console.error("Failed to load data:", error);
@@ -72,7 +93,6 @@ export default function DashboardPage() {
   };
 
   const filteredTasks = tasks.filter((task) => {
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const matchesSearch =
@@ -81,22 +101,26 @@ export default function DashboardPage() {
         task.pic_name.toLowerCase().includes(query);
       if (!matchesSearch) return false;
     }
-
-    // Outlet filter
-    if (selectedOutlet !== "ALL" && task.outlet !== selectedOutlet) {
-      return false;
-    }
-
-    // Status filter
-    if (selectedStatus !== "ALL" && task.status !== selectedStatus) {
-      return false;
-    }
-
+    if (selectedOutlet !== "ALL" && task.outlet !== selectedOutlet) return false;
+    if (selectedStatus !== "ALL" && task.status !== selectedStatus) return false;
     return true;
   });
 
-  const hasActiveFilters =
-    selectedOutlet !== "ALL" || selectedStatus !== "ALL" || searchQuery !== "";
+  const filteredChecklists = checklists.filter((checklist) => {
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        checklist.checklist_title.toLowerCase().includes(query) ||
+        checklist.task_id.toLowerCase().includes(query) ||
+        checklist.pic_name.toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+    }
+    if (selectedOutlet !== "ALL" && checklist.outlet !== selectedOutlet) return false;
+    if (selectedStatus !== "ALL" && checklist.status !== selectedStatus) return false;
+    return true;
+  });
+
+  const hasActiveFilters = selectedOutlet !== "ALL" || selectedStatus !== "ALL" || searchQuery !== "";
 
   const clearFilters = () => {
     setSelectedOutlet("ALL");
@@ -109,138 +133,307 @@ export default function DashboardPage() {
       <MobileHeader title="Dashboard" showSettings />
 
       <div className="p-4 space-y-4 max-w-5xl mx-auto">
-        {/* Summary Cards */}
-        <DashboardSummaryCards summary={summary} isLoading={isLoading} />
-
-        {/* Search and Filter Bar */}
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Cari tugas, ID, atau PIC..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Button
-            variant={showFilters ? "secondary" : "outline"}
-            size="icon"
-            onClick={() => setShowFilters(!showFilters)}
-            className="shrink-0"
-          >
-            <Filter className="w-4 h-4" />
-          </Button>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/recurring">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <RefreshCw className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground text-sm">Tugas Berulang</p>
+                  <p className="text-xs text-muted-foreground">Template & jadwal</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+              </CardContent>
+            </Card>
+          </Link>
           <Link href="/tasks/new">
-            <Button size="icon" className="shrink-0">
-              <Plus className="w-4 h-4" />
-            </Button>
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Plus className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground text-sm">Tugas Baru</p>
+                  <p className="text-xs text-muted-foreground">Buat tugas manual</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+              </CardContent>
+            </Card>
           </Link>
         </div>
 
-        {/* Filter Panel */}
-        {showFilters && (
-          <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
-            <Select
-              value={selectedOutlet}
-              onValueChange={(v) => setSelectedOutlet(v as Outlet | "ALL")}
-            >
-              <SelectTrigger className="w-[140px] bg-card">
-                <SelectValue placeholder="Outlet" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Semua Outlet</SelectItem>
-                {outlets.map((outlet) => (
-                  <SelectItem key={outlet} value={outlet}>
-                    {outlet}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "tasks" | "checklists")}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="tasks" className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Tugas ({summary.total})
+            </TabsTrigger>
+            <TabsTrigger value="checklists" className="flex items-center gap-2">
+              <ListChecks className="w-4 h-4" />
+              Checklist ({checklistSummary.total})
+            </TabsTrigger>
+          </TabsList>
 
-            <Select
-              value={selectedStatus}
-              onValueChange={(v) => setSelectedStatus(v as TaskStatus | "ALL")}
-            >
-              <SelectTrigger className="w-[140px] bg-card">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <TabsContent value="tasks" className="space-y-4 mt-4">
+            {/* Task Summary Cards */}
+            <DashboardSummaryCards summary={summary} isLoading={isLoading} />
 
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                className="text-muted-foreground"
-              >
-                <X className="w-4 h-4 mr-1" />
-                Reset
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Task List */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-foreground">
-              Daftar Tugas
-              {hasActiveFilters && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({filteredTasks.length} hasil)
-                </span>
-              )}
-            </h2>
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <TaskCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : filteredTasks.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
-                <Search className="w-8 h-8 text-muted-foreground" />
+            {/* Search and Filter Bar */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cari tugas, ID, atau PIC..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
               </div>
-              <h3 className="font-medium text-foreground mb-1">
-                Tidak ada tugas ditemukan
-              </h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                {hasActiveFilters
-                  ? "Coba ubah filter pencarian Anda"
-                  : "Belum ada tugas yang dibuat"}
-              </p>
-              {hasActiveFilters ? (
-                <Button variant="outline" onClick={clearFilters}>
-                  Reset Filter
+              <Button
+                variant={showFilters ? "secondary" : "outline"}
+                size="icon"
+                onClick={() => setShowFilters(!showFilters)}
+                className="shrink-0"
+              >
+                <Filter className="w-4 h-4" />
+              </Button>
+              <Link href="/tasks/new">
+                <Button size="icon" className="shrink-0">
+                  <Plus className="w-4 h-4" />
                 </Button>
-              ) : (
-                <Link href="/tasks/new">
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Buat Tugas Baru
+              </Link>
+            </div>
+
+            {/* Filter Panel */}
+            {showFilters && (
+              <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+                <Select
+                  value={selectedOutlet}
+                  onValueChange={(v) => setSelectedOutlet(v as Outlet | "ALL")}
+                >
+                  <SelectTrigger className="w-[140px] bg-card">
+                    <SelectValue placeholder="Outlet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Semua Outlet</SelectItem>
+                    {outlets.map((outlet) => (
+                      <SelectItem key={outlet} value={outlet}>{outlet}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={selectedStatus}
+                  onValueChange={(v) => setSelectedStatus(v as TaskStatus | "ALL")}
+                >
+                  <SelectTrigger className="w-[140px] bg-card">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                    <X className="w-4 h-4 mr-1" />
+                    Reset
                   </Button>
-                </Link>
+                )}
+              </div>
+            )}
+
+            {/* Task List */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-foreground">
+                  Daftar Tugas
+                  {hasActiveFilters && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      ({filteredTasks.length} hasil)
+                    </span>
+                  )}
+                </h2>
+              </div>
+
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <TaskCardSkeleton key={i} />
+                  ))}
+                </div>
+              ) : filteredTasks.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+                    <Search className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-medium text-foreground mb-1">Tidak ada tugas ditemukan</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {hasActiveFilters ? "Coba ubah filter pencarian Anda" : "Belum ada tugas yang dibuat"}
+                  </p>
+                  {hasActiveFilters ? (
+                    <Button variant="outline" onClick={clearFilters}>Reset Filter</Button>
+                  ) : (
+                    <Link href="/tasks/new">
+                      <Button>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Buat Tugas Baru
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredTasks.map((task) => (
+                    <TaskCard key={task.task_id} task={task} />
+                  ))}
+                </div>
               )}
             </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredTasks.map((task) => (
-                <TaskCard key={task.task_id} task={task} />
-              ))}
+          </TabsContent>
+
+          <TabsContent value="checklists" className="space-y-4 mt-4">
+            {/* Checklist Summary Cards */}
+            <ChecklistSummaryCards summary={checklistSummary} isLoading={isLoading} />
+
+            {/* Search and Filter Bar */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Cari checklist, ID, atau PIC..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                variant={showFilters ? "secondary" : "outline"}
+                size="icon"
+                onClick={() => setShowFilters(!showFilters)}
+                className="shrink-0"
+              >
+                <Filter className="w-4 h-4" />
+              </Button>
             </div>
-          )}
-        </div>
+
+            {/* Filter Panel */}
+            {showFilters && (
+              <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+                <Select
+                  value={selectedOutlet}
+                  onValueChange={(v) => setSelectedOutlet(v as Outlet | "ALL")}
+                >
+                  <SelectTrigger className="w-[140px] bg-card">
+                    <SelectValue placeholder="Outlet" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Semua Outlet</SelectItem>
+                    {outlets.map((outlet) => (
+                      <SelectItem key={outlet} value={outlet}>{outlet}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select
+                  value={selectedStatus}
+                  onValueChange={(v) => setSelectedStatus(v as TaskStatus | "ALL")}
+                >
+                  <SelectTrigger className="w-[140px] bg-card">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                    <X className="w-4 h-4 mr-1" />
+                    Reset
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Checklist List */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-foreground">
+                  Daftar Checklist Hari Ini
+                  {hasActiveFilters && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      ({filteredChecklists.length} hasil)
+                    </span>
+                  )}
+                </h2>
+              </div>
+
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <TaskCardSkeleton key={i} />
+                  ))}
+                </div>
+              ) : filteredChecklists.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+                    <ListChecks className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-medium text-foreground mb-1">Tidak ada checklist ditemukan</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {hasActiveFilters ? "Coba ubah filter pencarian Anda" : "Belum ada checklist hari ini"}
+                  </p>
+                  {hasActiveFilters ? (
+                    <Button variant="outline" onClick={clearFilters}>Reset Filter</Button>
+                  ) : (
+                    <Link href="/recurring">
+                      <Button>
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        Buat Template Recurring
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredChecklists.map((checklist) => (
+                    <Link key={checklist.task_id} href={`/checklists/${checklist.task_id}`}>
+                      <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <StatusBadge status={checklist.status} />
+                                <span className="text-xs text-muted-foreground">{checklist.task_id}</span>
+                              </div>
+                              <h3 className="font-medium text-foreground truncate">{checklist.checklist_title}</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {checklist.outlet} - {checklist.area} | PIC: {checklist.pic_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Deadline: {new Date(checklist.deadline).toLocaleString("id-ID")}
+                              </p>
+                            </div>
+                            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Floating Action Button for Mobile */}

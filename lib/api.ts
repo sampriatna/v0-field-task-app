@@ -5,8 +5,22 @@ import type {
   TaskFilters,
   DashboardSummary,
   ApiResponse,
+  RecurringTemplate,
+  CreateRecurringTemplatePayload,
+  UpdateRecurringTemplatePayload,
+  ChecklistReport,
+  SubmitChecklistPayload,
+  ChecklistSummary,
+  ChecklistItem,
 } from "./types";
-import { mockTasks, mockDashboardSummary } from "./mock-data";
+import { 
+  mockTasks, 
+  mockDashboardSummary, 
+  mockRecurringTemplates, 
+  mockChecklistReports, 
+  mockChecklistSummary,
+  mockChecklistItems,
+} from "./mock-data";
 
 const GAS_URL_KEY = "nusa_gas_web_app_url";
 const DEFAULT_GAS_URL = "https://script.google.com/macros/s/PASTE_GAS_URL_HERE/exec";
@@ -290,6 +304,360 @@ export async function resendWhatsApp(taskId: string): Promise<ApiResponse<void>>
     return {
       success: false,
       error: error instanceof Error ? error.message : "Gagal mengirim ulang WhatsApp",
+    };
+  }
+}
+
+// =============================================
+// RECURRING TEMPLATE API FUNCTIONS
+// =============================================
+
+export async function getRecurringTemplates(): Promise<ApiResponse<RecurringTemplate[]>> {
+  try {
+    const result = await callGas<RecurringTemplate[]>("getRecurringTemplates", undefined, "GET");
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      return { success: true, data: mockRecurringTemplates };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengambil template berulang",
+    };
+  }
+}
+
+export async function getRecurringTemplate(templateId: string): Promise<ApiResponse<RecurringTemplate>> {
+  try {
+    const result = await callGas<RecurringTemplate>("getRecurringTemplate", { template_id: templateId }, "GET");
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(300);
+      const template = mockRecurringTemplates.find(t => t.template_id === templateId);
+      if (template) {
+        return { success: true, data: template };
+      }
+      return { success: false, error: "Template tidak ditemukan" };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengambil template",
+    };
+  }
+}
+
+export async function createRecurringTemplate(
+  payload: CreateRecurringTemplatePayload
+): Promise<ApiResponse<RecurringTemplate>> {
+  try {
+    const result = await callGas<RecurringTemplate>(
+      "createRecurringTemplate",
+      payload as unknown as Record<string, unknown>
+    );
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(1000);
+      const newTemplate: RecurringTemplate = {
+        template_id: `REC-${String(Date.now()).slice(-6)}`,
+        ...payload,
+        active_status: true,
+        template_version: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      return { success: true, data: newTemplate };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal membuat template berulang",
+    };
+  }
+}
+
+export async function updateRecurringTemplate(
+  payload: UpdateRecurringTemplatePayload
+): Promise<ApiResponse<RecurringTemplate>> {
+  try {
+    const result = await callGas<RecurringTemplate>(
+      "updateRecurringTemplate",
+      payload as unknown as Record<string, unknown>
+    );
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(1000);
+      const existingTemplate = mockRecurringTemplates.find(t => t.template_id === payload.template_id);
+      const updatedTemplate: RecurringTemplate = {
+        ...payload,
+        active_status: true,
+        template_version: (existingTemplate?.template_version || 0) + 1,
+        created_at: existingTemplate?.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      return { success: true, data: updatedTemplate };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengupdate template",
+    };
+  }
+}
+
+export async function toggleRecurringTemplateStatus(
+  templateId: string,
+  active: boolean
+): Promise<ApiResponse<void>> {
+  try {
+    const result = await callGas<void>("toggleRecurringTemplateStatus", { 
+      template_id: templateId, 
+      active 
+    });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      return { success: true };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengubah status template",
+    };
+  }
+}
+
+// =============================================
+// CHECKLIST TEMPLATE API FUNCTIONS
+// =============================================
+
+export async function getChecklistItems(templateId: string): Promise<ApiResponse<ChecklistItem[]>> {
+  try {
+    const result = await callGas<ChecklistItem[]>("getChecklistItems", { template_id: templateId }, "GET");
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(300);
+      const items = mockChecklistItems.filter(i => i.template_id === templateId);
+      return { success: true, data: items };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengambil item checklist",
+    };
+  }
+}
+
+export async function saveChecklistItems(
+  templateId: string,
+  items: Omit<ChecklistItem, "checklist_item_id" | "template_id">[]
+): Promise<ApiResponse<ChecklistItem[]>> {
+  try {
+    const result = await callGas<ChecklistItem[]>("saveChecklistItems", {
+      template_id: templateId,
+      items,
+    });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(800);
+      const savedItems: ChecklistItem[] = items.map((item, index) => ({
+        ...item,
+        checklist_item_id: `CHK-${templateId}-${String(index + 1).padStart(2, "0")}`,
+        template_id: templateId,
+      }));
+      return { success: true, data: savedItems };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menyimpan item checklist",
+    };
+  }
+}
+
+// =============================================
+// CHECKLIST REPORT API FUNCTIONS
+// =============================================
+
+export async function getChecklistByToken(
+  taskId: string,
+  token: string
+): Promise<ApiResponse<ChecklistReport>> {
+  try {
+    const result = await callGas<ChecklistReport>(
+      "getChecklistByToken",
+      { task_id: taskId, token },
+      "GET"
+    );
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      const report = mockChecklistReports.find(
+        (r) => r.task_id === taskId && r.token === token
+      );
+      if (report) {
+        return { success: true, data: report };
+      }
+      return { success: false, error: "Link checklist tidak valid" };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengambil checklist",
+    };
+  }
+}
+
+export async function submitChecklistReport(
+  payload: SubmitChecklistPayload
+): Promise<ApiResponse<void>> {
+  try {
+    const result = await callGas<void>(
+      "submitChecklistReport",
+      payload as unknown as Record<string, unknown>
+    );
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(1500);
+      return { success: true };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengirim laporan checklist",
+    };
+  }
+}
+
+export async function getChecklistReports(
+  filters?: { outlet?: string; status?: string }
+): Promise<ApiResponse<ChecklistReport[]>> {
+  try {
+    const result = await callGas<ChecklistReport[]>(
+      "getChecklistReports",
+      filters as unknown as Record<string, unknown>,
+      "GET"
+    );
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      let reports = [...mockChecklistReports];
+
+      if (filters?.outlet) {
+        reports = reports.filter((r) => r.outlet === filters.outlet);
+      }
+      if (filters?.status) {
+        reports = reports.filter((r) => r.status === filters.status);
+      }
+
+      return { success: true, data: reports };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengambil daftar checklist",
+    };
+  }
+}
+
+export async function getChecklistDetail(taskId: string): Promise<ApiResponse<ChecklistReport>> {
+  try {
+    const result = await callGas<ChecklistReport>("getChecklistDetail", { task_id: taskId }, "GET");
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      const report = mockChecklistReports.find((r) => r.task_id === taskId);
+      if (report) {
+        return { success: true, data: report };
+      }
+      return { success: false, error: "Checklist tidak ditemukan" };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengambil detail checklist",
+    };
+  }
+}
+
+export async function getChecklistSummary(): Promise<ApiResponse<ChecklistSummary>> {
+  try {
+    const result = await callGas<ChecklistSummary>("getChecklistSummary", undefined, "GET");
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(300);
+      return { success: true, data: mockChecklistSummary };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengambil summary checklist",
+    };
+  }
+}
+
+export async function verifyChecklist(
+  taskId: string,
+  status: "approved" | "revision",
+  note?: string
+): Promise<ApiResponse<void>> {
+  try {
+    const action = status === "approved" ? "approveChecklist" : "requestChecklistRevision";
+    const result = await callGas<void>(action, { task_id: taskId, note });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(800);
+      return { success: true };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal memverifikasi checklist",
+    };
+  }
+}
+
+export async function resendChecklistWhatsApp(taskId: string): Promise<ApiResponse<void>> {
+  try {
+    const result = await callGas<void>("resendChecklistWhatsApp", { task_id: taskId });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(1000);
+      return { success: true };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengirim ulang WhatsApp checklist",
     };
   }
 }
