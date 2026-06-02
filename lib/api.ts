@@ -23,7 +23,7 @@ import {
 } from "./mock-data";
 
 const GAS_URL_KEY = "nusa_gas_web_app_url";
-const DEFAULT_GAS_URL = "https://script.google.com/macros/s/PASTE_GAS_URL_HERE/exec";
+const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbz7VvBRsFg-6Nkfc-P1zqRAHB1T7xjcA2z3b-TShsKicZIz1NqmDJ2hnvxDWOx_YzM/exec";
 
 function getGasUrl(): string {
   if (typeof window === "undefined") return DEFAULT_GAS_URL;
@@ -42,7 +42,7 @@ export function getStoredGasUrl(): string {
 
 function isGasConfigured(): boolean {
   const url = getGasUrl();
-  return url !== DEFAULT_GAS_URL && url.includes("script.google.com");
+  return url.includes("script.google.com") && !url.includes("PASTE_GAS_URL_HERE");
 }
 
 async function callGas<T>(
