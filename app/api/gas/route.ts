@@ -5,7 +5,6 @@ import { getSession, isAuthenticated } from "@/lib/auth";
 const ADMIN_ACTIONS = [
   "createTask",
   "getTasks",
-  "getTaskDetail",
   "verifyTask",
   "requestRevision",
   "resendWhatsApp",
@@ -48,6 +47,7 @@ const ADMIN_ACTIONS = [
 const PUBLIC_ACTIONS = [
   "healthCheck",
   "getTaskByToken",
+  "getTaskDetail",
   "markOpened",
   "submitTaskReport",
   "getChecklistByToken",

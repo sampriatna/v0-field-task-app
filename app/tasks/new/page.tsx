@@ -16,10 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle2, Send } from "lucide-react";
-import { createTask } from "@/lib/api";
+import { CheckCircle2, Send, Copy, AlertTriangle, ExternalLink } from "lucide-react";
+import { createTask, buildReportLink } from "@/lib/api";
 import { outlets, areas, categories, priorities, staffList } from "@/lib/mock-data";
-import type { CreateTaskPayload, Outlet, Area, Category, TaskPriority } from "@/lib/types";
+import type { CreateTaskPayload, Outlet, Area, Category, TaskPriority, Task } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 export default function CreateTaskPage() {
@@ -27,6 +27,7 @@ export default function CreateTaskPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [createdTask, setCreatedTask] = useState<Task | null>(null);
 
   // Form state
   const [outlet, setOutlet] = useState<Outlet | "">("");
@@ -94,6 +95,11 @@ export default function CreateTaskPage() {
       const result = await createTask(payload);
 
       if (result.success) {
+        const created = result.data ?? null;
+        console.log("[v0] created task_id:", created?.task_id);
+        console.log("[v0] created status:", created?.status);
+        console.log("[v0] created report_link (raw):", created?.report_link);
+        setCreatedTask(created);
         setIsSuccess(true);
       } else {
         toast({
@@ -114,6 +120,21 @@ export default function CreateTaskPage() {
   };
 
   if (isSuccess) {
+    const hasToken = Boolean(createdTask?.token);
+    // Always use the correct frontend route, falling back to a locally built
+    // link if GAS returned an empty or wrong-format report_link.
+    const reportLink =
+      createdTask?.task_id && createdTask?.token
+        ? buildReportLink(createdTask.task_id, createdTask.token)
+        : "";
+
+    const copyLink = () => {
+      if (reportLink) {
+        navigator.clipboard?.writeText(reportLink);
+        toast({ title: "Link disalin", description: "Link report sudah disalin." });
+      }
+    };
+
     return (
       <div className="min-h-screen bg-background">
         <MobileHeader title="Buat Tugas" showBack backHref="/dashboard" />
@@ -129,11 +150,50 @@ export default function CreateTaskPage() {
             <p className="text-muted-foreground">
               Notifikasi WhatsApp sedang diproses dan akan dikirim ke {picName}.
             </p>
+
+            {hasToken && reportLink ? (
+              <div className="text-left bg-muted/50 rounded-lg p-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Link Report Staff
+                </p>
+                <p className="text-xs font-mono break-all text-foreground">
+                  {reportLink}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={copyLink}
+                    className="flex-1"
+                  >
+                    <Copy className="w-4 h-4 mr-1" />
+                    Salin
+                  </Button>
+                  <a href={reportLink} target="_blank" rel="noopener noreferrer" className="flex-1">
+                    <Button type="button" variant="outline" size="sm" className="w-full">
+                      <ExternalLink className="w-4 h-4 mr-1" />
+                      Buka
+                    </Button>
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="text-left bg-warning/10 border border-warning/30 rounded-lg p-3 flex gap-2">
+                <AlertTriangle className="w-5 h-5 text-warning-foreground shrink-0 mt-0.5" />
+                <p className="text-sm text-warning-foreground">
+                  Tugas tersimpan, tetapi server tidak mengembalikan token/link
+                  report. Periksa Google Sheet atau hubungi admin.
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3 pt-4">
               <Button
                 variant="outline"
                 onClick={() => {
                   setIsSuccess(false);
+                  setCreatedTask(null);
                   setOutlet("");
                   setArea("");
                   setCategory("");
