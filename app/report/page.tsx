@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 
@@ -10,7 +10,7 @@ import { AlertTriangle } from "lucide-react";
  * The real staff report route is path-based: /report/[taskId]?token=YYY
  * This page bridges the two by redirecting to the correct URL.
  */
-export default function ReportRedirectPage() {
+function ReportRedirectContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [invalid, setInvalid] = useState(false);
@@ -47,5 +47,20 @@ export default function ReportRedirectPage() {
       <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary border-t-transparent" />
       <p className="text-xl font-medium text-foreground mt-6">Membuka Tugas...</p>
     </div>
+  );
+}
+
+export default function ReportRedirectPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary border-t-transparent" />
+          <p className="text-xl font-medium text-foreground mt-6">Memuat...</p>
+        </div>
+      }
+    >
+      <ReportRedirectContent />
+    </Suspense>
   );
 }
