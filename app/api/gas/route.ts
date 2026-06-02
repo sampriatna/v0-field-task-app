@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession, isAuthenticated } from "@/lib/auth";
 
-// Reload trigger: env var updated
+// ENV reload: NusaFood2026AdminKey
 
 // Actions that require admin authentication
 const ADMIN_ACTIONS = [
