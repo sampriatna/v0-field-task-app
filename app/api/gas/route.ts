@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession, isAuthenticated } from "@/lib/auth";
 
-// ENV reload: NusaFood2026AdminKey
+// ENV reload v3 - after Vercel dashboard update
 
 // Actions that require admin authentication
 const ADMIN_ACTIONS = [
