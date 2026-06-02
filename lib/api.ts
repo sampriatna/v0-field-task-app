@@ -25,17 +25,44 @@ import {
 // Internal API endpoint - no longer expose GAS URL directly
 const API_BASE = "/api/gas";
 
-// GAS can return the task list in several shapes. Normalize them all to an array.
+// Robust normalizer untuk berbagai format response dari GAS
 function normalizeTaskList(data: unknown): Task[] {
-  if (!data) return [];
-  if (Array.isArray(data)) return data as Task[];
+  if (!data) {
+    console.log("[v0] normalizeTaskList: data is null/undefined, returning empty");
+    return [];
+  }
+  
+  // Jika sudah array, return langsung
+  if (Array.isArray(data)) {
+    console.log("[v0] normalizeTaskList: direct array, count:", data.length);
+    return data as Task[];
+  }
+  
+  // Jika object, cari task di berbagai key
   if (typeof data === "object") {
     const obj = data as Record<string, unknown>;
-    if (Array.isArray(obj.tasks)) return obj.tasks as Task[];
-    if (Array.isArray(obj.rows)) return obj.rows as Task[];
-    if (Array.isArray(obj.items)) return obj.items as Task[];
-    if (Array.isArray(obj.data)) return obj.data as Task[];
+    
+    if (Array.isArray(obj.tasks)) {
+      console.log("[v0] normalizeTaskList: found in .tasks, count:", obj.tasks.length);
+      return obj.tasks as Task[];
+    }
+    if (Array.isArray(obj.data)) {
+      console.log("[v0] normalizeTaskList: found in .data, count:", obj.data.length);
+      return obj.data as Task[];
+    }
+    if (Array.isArray(obj.rows)) {
+      console.log("[v0] normalizeTaskList: found in .rows, count:", obj.rows.length);
+      return obj.rows as Task[];
+    }
+    if (Array.isArray(obj.items)) {
+      console.log("[v0] normalizeTaskList: found in .items, count:", obj.items.length);
+      return obj.items as Task[];
+    }
+    
+    console.log("[v0] normalizeTaskList: object has no array fields, keys:", Object.keys(obj));
   }
+  
+  console.log("[v0] normalizeTaskList: no array found, returning empty");
   return [];
 }
 
@@ -220,6 +247,8 @@ export async function submitTaskReport(
 
 export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[]>> {
   try {
+    console.log("[v0] getTasks: loading with filters:", filters ? Object.keys(filters) : "none");
+    
     const result = await callApi<unknown>(
       "getTasks",
       filters as unknown as Record<string, unknown>,
@@ -227,6 +256,7 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
     );
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      console.log("[v0] getTasks: GAS not configured, using mock data");
       await delay(500);
       let tasks = [...mockTasks];
 
@@ -242,20 +272,24 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
         );
       }
 
+      console.log("[v0] getTasks: mock data count:", tasks.length);
       return { success: true, data: tasks };
     }
 
-    if (result.success) {
+    if (result.success && result.data !== undefined) {
       const list = normalizeTaskList(result.data);
-      console.log("[v0] getTasks count:", list.length);
+      console.log("[v0] getTasks: success, normalized count:", list.length);
       return { success: true, data: list };
     }
 
+    console.log("[v0] getTasks: error:", result.error);
     return { success: false, error: result.error };
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    console.log("[v0] getTasks: exception:", errorMsg);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Gagal mengambil daftar tugas",
+      error: errorMsg || "Gagal mengambil daftar tugas",
     };
   }
 }
