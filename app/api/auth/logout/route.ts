@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
-import { clearSessionCookie } from "@/lib/auth";
+
+const SESSION_COOKIE_NAME = "nusa_session";
 
 export async function POST() {
-  try {
-    await clearSessionCookie();
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error("Logout error:", error);
-    return NextResponse.json(
-      { success: false, error: "Terjadi kesalahan saat logout" },
-      { status: 500 }
-    );
-  }
+  const response = NextResponse.json({ success: true });
+  
+  response.cookies.set(SESSION_COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+
+  return response;
 }
