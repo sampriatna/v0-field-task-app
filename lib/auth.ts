@@ -104,6 +104,9 @@ export function validateAdminPassword(password: string): boolean {
     return false;
   }
 
+  console.log("[v0] Password validation - input length:", password.length, "expected length:", adminPassword.length);
+  console.log("[v0] Match result:", password === adminPassword);
+  
   return password === adminPassword;
 }
 
