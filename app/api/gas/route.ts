@@ -44,7 +44,7 @@ const ADMIN_ACTIONS = [
   "generateRecurringTasks",
 ];
 
-// Actions that are public (staff report pages)
+// Actions that are public (staff report pages) - no admin_secret needed
 const PUBLIC_ACTIONS = [
   "healthCheck",
   "getTaskByToken",
@@ -69,6 +69,7 @@ async function forwardToGas(
   includeAdminSecret: boolean
 ): Promise<Response> {
   const gasUrl = process.env.GAS_WEB_APP_URL;
+  const adminApiKey = process.env.ADMIN_API_KEY;
 
   if (!gasUrl) {
     return NextResponse.json(
@@ -77,30 +78,64 @@ async function forwardToGas(
     );
   }
 
-  // Add admin secret for admin actions
-  const finalPayload = includeAdminSecret
-    ? { ...payload, admin_secret: process.env.ADMIN_API_KEY }
-    : payload;
+  // Build final payload - add admin_secret only for admin actions
+  const finalPayload: Record<string, unknown> = { ...payload };
+  
+  if (includeAdminSecret) {
+    if (!adminApiKey) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: "ADMIN_API_KEY tidak dikonfigurasi di server",
+          debug: {
+            hasAdminApiKey: false,
+            action,
+            isAdminAction: true,
+            forwardedWithAdminSecret: false,
+          }
+        },
+        { status: 500 }
+      );
+    }
+    finalPayload.admin_secret = adminApiKey;
+  }
 
   try {
     let response: Response;
 
     if (method === "GET") {
-      const params = new URLSearchParams({ 
-        action, 
-        ...Object.fromEntries(
-          Object.entries(finalPayload).map(([k, v]) => [k, String(v)])
-        )
-      });
-      response = await fetch(`${gasUrl}?${params.toString()}`, {
+      // Build query params - include action and all payload fields
+      const params = new URLSearchParams();
+      params.set("action", action);
+      
+      // Add admin_secret to query params for GET requests if needed
+      for (const [key, value] of Object.entries(finalPayload)) {
+        if (value !== undefined && value !== null) {
+          params.set(key, String(value));
+        }
+      }
+      
+      const fullUrl = `${gasUrl}?${params.toString()}`;
+      
+      response = await fetch(fullUrl, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+        },
       });
     } else {
+      // POST request - send action in body along with payload
+      const bodyData = {
+        action,
+        ...finalPayload,
+      };
+      
       response = await fetch(gasUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, ...finalPayload }),
+        headers: { 
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(bodyData),
       });
     }
 
@@ -110,6 +145,25 @@ async function forwardToGas(
     // Try to parse as JSON
     try {
       const data = JSON.parse(responseText);
+      
+      // If GAS returns ADMIN_SECRET_INVALID, add debug info
+      if (data.error === "ADMIN_SECRET_INVALID" || responseText.includes("ADMIN_SECRET_INVALID")) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: "Admin API key tidak valid atau tidak cocok dengan GAS",
+            debug: {
+              hasAdminApiKey: !!adminApiKey,
+              adminApiKeyLength: adminApiKey ? adminApiKey.length : 0,
+              action,
+              isAdminAction: includeAdminSecret,
+              forwardedWithAdminSecret: includeAdminSecret,
+            }
+          },
+          { status: 401 }
+        );
+      }
+      
       return NextResponse.json(data);
     } catch {
       // Response is not valid JSON
@@ -125,13 +179,26 @@ async function forwardToGas(
       
       if (responseText.includes("ADMIN_SECRET_INVALID")) {
         return NextResponse.json(
-          { success: false, error: "Admin API key tidak valid" },
+          { 
+            success: false, 
+            error: "Admin API key tidak valid",
+            debug: {
+              hasAdminApiKey: !!adminApiKey,
+              action,
+              isAdminAction: includeAdminSecret,
+              forwardedWithAdminSecret: includeAdminSecret,
+            }
+          },
           { status: 401 }
         );
       }
       
       return NextResponse.json(
-        { success: false, error: "Server mengembalikan response tidak valid. Cek GAS logs." },
+        { 
+          success: false, 
+          error: "Response dari GAS bukan JSON valid",
+          raw: responseText.substring(0, 200),
+        },
         { status: 500 }
       );
     }
@@ -144,6 +211,7 @@ async function forwardToGas(
   }
 }
 
+// GET handler
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const action = searchParams.get("action");
@@ -158,7 +226,7 @@ export async function GET(request: Request) {
   // Check if action is allowed
   if (!isPublicAction(action) && !isAdminAction(action)) {
     return NextResponse.json(
-      { success: false, error: "Unknown action" },
+      { success: false, error: `Unknown action: ${action}` },
       { status: 400 }
     );
   }
@@ -168,7 +236,7 @@ export async function GET(request: Request) {
     const session = await getSession();
     if (!isAuthenticated(session)) {
       return NextResponse.json(
-        { success: false, error: "Unauthorized" },
+        { success: false, error: "Unauthorized - login required" },
         { status: 401 }
       );
     }
@@ -182,9 +250,11 @@ export async function GET(request: Request) {
     }
   });
 
+  // Forward to GAS - include admin_secret only for admin actions
   return forwardToGas(action, payload, "GET", isAdminAction(action));
 }
 
+// POST handler
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -200,7 +270,7 @@ export async function POST(request: Request) {
     // Check if action is allowed
     if (!isPublicAction(action) && !isAdminAction(action)) {
       return NextResponse.json(
-        { success: false, error: "Unknown action" },
+        { success: false, error: `Unknown action: ${action}` },
         { status: 400 }
       );
     }
@@ -210,12 +280,13 @@ export async function POST(request: Request) {
       const session = await getSession();
       if (!isAuthenticated(session)) {
         return NextResponse.json(
-          { success: false, error: "Unauthorized" },
+          { success: false, error: "Unauthorized - login required" },
           { status: 401 }
         );
       }
     }
 
+    // Forward to GAS - include admin_secret only for admin actions
     return forwardToGas(action, payload, "POST", isAdminAction(action));
   } catch {
     return NextResponse.json(
