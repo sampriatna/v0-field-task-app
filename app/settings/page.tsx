@@ -13,10 +13,12 @@ import {
   Building2,
   Layers,
   LogOut,
+  ChevronRight,
 } from "lucide-react";
 import { outlets, areas, categories, staffList } from "@/lib/mock-data";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -146,39 +148,49 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        {/* Staff List */}
-        <Card className="p-4 space-y-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">Daftar Staff</h3>
-              <p className="text-sm text-muted-foreground">
-                Staff yang terdaftar (data dummy untuk MVP)
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            {staffList.map((staff) => (
-              <div
-                key={staff.name}
-                className="flex items-center justify-between p-2 bg-muted/50 rounded-lg"
-              >
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    {staff.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{staff.wa}</p>
+        {/* Staff List - Link to Staff Master */}
+        <Link href="/settings/staff">
+          <Card className="p-4 space-y-4 hover:border-primary/50 transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Users className="w-5 h-5 text-primary" />
                 </div>
-                <Badge variant="secondary" className="text-xs">
-                  {staff.outlet}
-                </Badge>
+                <div>
+                  <h3 className="font-semibold text-foreground">Master Staff</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Kelola daftar staff, posisi, dan nomor WhatsApp
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
-        </Card>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+
+            <div className="space-y-2">
+              {staffList.slice(0, 3).map((staff) => (
+                <div
+                  key={staff.name}
+                  className="flex items-center justify-between p-2 bg-muted/50 rounded-lg"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-foreground">
+                      {staff.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{staff.wa}</p>
+                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {staff.outlet}
+                  </Badge>
+                </div>
+              ))}
+              {staffList.length > 3 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  +{staffList.length - 3} staff lainnya
+                </p>
+              )}
+            </div>
+          </Card>
+        </Link>
 
         {/* System Info */}
         <Card className="p-4">

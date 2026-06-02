@@ -12,6 +12,9 @@ import type {
   SubmitChecklistPayload,
   ChecklistSummary,
   ChecklistItem,
+  Staff,
+  CreateStaffPayload,
+  UpdateStaffPayload,
 } from "./types";
 import { 
   mockTasks, 
@@ -730,6 +733,163 @@ export async function resendChecklistWhatsApp(taskId: string): Promise<ApiRespon
     return {
       success: false,
       error: error instanceof Error ? error.message : "Gagal mengirim ulang WhatsApp checklist",
+    };
+  }
+}
+
+// =============================================
+// STAFF MASTER API FUNCTIONS
+// =============================================
+
+// Mock staff data for fallback
+const mockStaff: Staff[] = [
+  {
+    staff_id: "STF-001",
+    name: "Budi Santoso",
+    position: "Cook",
+    outlet: "KBU",
+    area: "Dapur",
+    wa_number: "6281234567890",
+    role: "STAFF",
+    status: "ACTIVE",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    staff_id: "STF-002",
+    name: "Ani Wijaya",
+    position: "Barista",
+    outlet: "Kisamen",
+    area: "Bar",
+    wa_number: "6281234567891",
+    role: "STAFF",
+    status: "ACTIVE",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+export async function getStaff(filters?: { outlet?: string; status?: string }): Promise<ApiResponse<Staff[]>> {
+  try {
+    const result = await callApi<Staff[]>("getStaff", filters as Record<string, string>, "GET");
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      let staff = [...mockStaff];
+      if (filters?.outlet) {
+        staff = staff.filter(s => s.outlet === filters.outlet);
+      }
+      if (filters?.status) {
+        staff = staff.filter(s => s.status === filters.status);
+      }
+      return { success: true, data: staff };
+    }
+
+    // Normalize response - GAS might return in different formats
+    if (result.success && result.data) {
+      const data = result.data as unknown;
+      if (Array.isArray(data)) {
+        return { success: true, data: data as Staff[] };
+      }
+      if (typeof data === "object" && data !== null) {
+        const obj = data as Record<string, unknown>;
+        if (Array.isArray(obj.staff)) return { success: true, data: obj.staff as Staff[] };
+        if (Array.isArray(obj.data)) return { success: true, data: obj.data as Staff[] };
+        if (Array.isArray(obj.rows)) return { success: true, data: obj.rows as Staff[] };
+      }
+      return { success: true, data: [] };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengambil daftar staff",
+    };
+  }
+}
+
+export async function createStaff(payload: CreateStaffPayload): Promise<ApiResponse<Staff>> {
+  try {
+    const result = await callApi<Staff>("createStaff", payload as unknown as Record<string, unknown>);
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(1000);
+      const newStaff: Staff = {
+        staff_id: `STF-${String(Date.now()).slice(-6)}`,
+        ...payload,
+        status: "ACTIVE",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      return { success: true, data: newStaff };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menambah staff",
+    };
+  }
+}
+
+export async function updateStaff(payload: UpdateStaffPayload): Promise<ApiResponse<Staff>> {
+  try {
+    const result = await callApi<Staff>("updateStaff", payload as unknown as Record<string, unknown>);
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(1000);
+      const updatedStaff: Staff = {
+        ...payload,
+        status: "ACTIVE",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      return { success: true, data: updatedStaff };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengupdate staff",
+    };
+  }
+}
+
+export async function deactivateStaff(staffId: string): Promise<ApiResponse<void>> {
+  try {
+    const result = await callApi<void>("deactivateStaff", { staff_id: staffId });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      return { success: true };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menonaktifkan staff",
+    };
+  }
+}
+
+export async function activateStaff(staffId: string): Promise<ApiResponse<void>> {
+  try {
+    const result = await callApi<void>("activateStaff", { staff_id: staffId });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      return { success: true };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengaktifkan staff",
     };
   }
 }

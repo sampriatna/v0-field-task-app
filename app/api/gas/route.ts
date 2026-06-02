@@ -37,6 +37,8 @@ const ADMIN_ACTIONS = [
   "createStaff",
   "updateStaff",
   "deleteStaff",
+  "deactivateStaff",
+  "activateStaff",
   "getStaff",
   "getChecklistTemplate",
   "saveChecklistTemplate",

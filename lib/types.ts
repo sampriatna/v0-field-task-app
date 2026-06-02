@@ -1,11 +1,17 @@
 export type TaskStatus =
+  | "CREATED"
   | "SENT"
+  | "WA_FAILED"
   | "OPEN"
   | "OPENED"
   | "SUBMITTED"
+  | "RESUBMITTED"
+  | "WAITING_VERIFICATION"
   | "DONE"
   | "VERIFIED"
   | "REVISI"
+  | "REVISION"
+  | "REVISION_REQUESTED"
   | "LATE";
 
 export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
@@ -59,9 +65,10 @@ export interface Task {
   verified_by?: string;
   verified_at?: string;
   final_status?: string;
-  is_late: boolean;
+  is_late: boolean | string; // Can be boolean or "YES"/"NO" from GAS
   duration_minutes?: number;
   last_updated: string;
+  checklist_mode?: string; // "YES" for checklist tasks, undefined/empty for manual tasks
 }
 
 export interface CreateTaskPayload {
@@ -234,4 +241,34 @@ export interface ChecklistSummary {
 export interface FullDashboardSummary {
   tasks: DashboardSummary;
   checklists: ChecklistSummary;
+}
+
+// Staff Master Types
+export type StaffRole = "STAFF" | "LEADER" | "ADMIN";
+export type StaffStatus = "ACTIVE" | "INACTIVE";
+
+export interface Staff {
+  staff_id: string;
+  name: string;
+  position: string;
+  outlet: Outlet;
+  area: Area;
+  wa_number: string;
+  role: StaffRole;
+  status: StaffStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateStaffPayload {
+  name: string;
+  position: string;
+  outlet: Outlet;
+  area: Area;
+  wa_number: string;
+  role: StaffRole;
+}
+
+export interface UpdateStaffPayload extends CreateStaffPayload {
+  staff_id: string;
 }

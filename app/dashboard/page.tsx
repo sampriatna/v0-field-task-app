@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { getTasks, getDashboardSummary, getChecklistReports, getChecklistSummary } from "@/lib/api";
+import { getTasks, getChecklistReports } from "@/lib/api";
 import type { Task, DashboardSummary, TaskStatus, Outlet, ChecklistReport, ChecklistSummary } from "@/lib/types";
 import { outlets } from "@/lib/mock-data";
 import { StatusBadge } from "@/components/status-badge";
@@ -63,27 +63,61 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
+  // Calculate summary from tasks array to ensure consistency
+  const calculateTaskSummary = (taskList: Task[]): DashboardSummary => {
+    const manualTasks = taskList.filter(t => t.checklist_mode !== "YES");
+    
+    // Status groupings per requirements
+    const openStatuses = ["CREATED", "SENT", "WA_FAILED", "OPEN", "OPENED"];
+    const submittedStatuses = ["SUBMITTED", "RESUBMITTED", "WAITING_VERIFICATION"];
+    const doneStatuses = ["DONE", "VERIFIED"];
+    const revisiStatuses = ["REVISI", "REVISION", "REVISION_REQUESTED"];
+    
+    return {
+      total: manualTasks.length,
+      open: manualTasks.filter(t => openStatuses.includes(t.status)).length,
+      submitted: manualTasks.filter(t => submittedStatuses.includes(t.status)).length,
+      done: manualTasks.filter(t => doneStatuses.includes(t.status)).length,
+      late: manualTasks.filter(t => t.status === "LATE" || t.is_late === true || t.is_late === "YES").length,
+      revisi: manualTasks.filter(t => revisiStatuses.includes(t.status)).length,
+    };
+  };
+
+  // Calculate checklist summary from tasks with checklist_mode === "YES"
+  const calculateChecklistSummary = (taskList: Task[]): ChecklistSummary => {
+    const checklistTasks = taskList.filter(t => t.checklist_mode === "YES");
+    
+    const openStatuses = ["CREATED", "SENT", "WA_FAILED", "OPEN", "OPENED"];
+    const submittedStatuses = ["SUBMITTED", "RESUBMITTED", "WAITING_VERIFICATION"];
+    const doneStatuses = ["DONE", "VERIFIED"];
+    const revisiStatuses = ["REVISI", "REVISION", "REVISION_REQUESTED"];
+    
+    return {
+      total: checklistTasks.length,
+      open: checklistTasks.filter(t => openStatuses.includes(t.status)).length,
+      submitted: checklistTasks.filter(t => submittedStatuses.includes(t.status)).length,
+      done: checklistTasks.filter(t => doneStatuses.includes(t.status)).length,
+      late: checklistTasks.filter(t => t.status === "LATE" || t.is_late === true || t.is_late === "YES").length,
+      revisi: checklistTasks.filter(t => revisiStatuses.includes(t.status)).length,
+    };
+  };
+
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [tasksResult, summaryResult, checklistsResult, checklistSummaryResult] = await Promise.all([
+      const [tasksResult, checklistsResult] = await Promise.all([
         getTasks(),
-        getDashboardSummary(),
         getChecklistReports(),
-        getChecklistSummary(),
       ]);
 
       if (tasksResult.success && tasksResult.data) {
         setTasks(tasksResult.data);
-      }
-      if (summaryResult.success && summaryResult.data) {
-        setSummary(summaryResult.data);
+        // Calculate summary from actual tasks data
+        setSummary(calculateTaskSummary(tasksResult.data));
+        setChecklistSummary(calculateChecklistSummary(tasksResult.data));
       }
       if (checklistsResult.success && checklistsResult.data) {
         setChecklists(checklistsResult.data);
-      }
-      if (checklistSummaryResult.success && checklistSummaryResult.data) {
-        setChecklistSummary(checklistSummaryResult.data);
       }
     } catch (error) {
       console.error("Failed to load data:", error);
@@ -92,7 +126,11 @@ export default function DashboardPage() {
     }
   };
 
-  const filteredTasks = tasks.filter((task) => {
+  // Filter tasks: manual tasks (non-checklist) and checklist tasks
+  const manualTasks = tasks.filter(t => t.checklist_mode !== "YES");
+  const checklistTasks = tasks.filter(t => t.checklist_mode === "YES");
+
+  const filteredTasks = manualTasks.filter((task) => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const matchesSearch =
@@ -170,11 +208,11 @@ export default function DashboardPage() {
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="tasks" className="flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
-              Tugas ({summary.total})
+              Tugas ({manualTasks.length})
             </TabsTrigger>
             <TabsTrigger value="checklists" className="flex items-center gap-2">
               <ListChecks className="w-4 h-4" />
-              Checklist ({checklistSummary.total})
+              Checklist ({checklistTasks.length})
             </TabsTrigger>
           </TabsList>
 
