@@ -1,20 +1,27 @@
 "use client";
 
-import type { TaskStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface StatusBadgeProps {
-  status: TaskStatus;
+  status: string;
   className?: string;
 }
 
 const statusConfig: Record<
-  TaskStatus,
+  string,
   { label: string; className: string }
 > = {
+  SENT: {
+    label: "Terkirim",
+    className: "bg-sky-100 text-sky-800 border-sky-200",
+  },
   OPEN: {
     label: "Open",
     className: "bg-blue-100 text-blue-800 border-blue-200",
+  },
+  OPENED: {
+    label: "Dibuka",
+    className: "bg-indigo-100 text-indigo-800 border-indigo-200",
   },
   SUBMITTED: {
     label: "Submitted",
@@ -22,6 +29,10 @@ const statusConfig: Record<
   },
   DONE: {
     label: "Done",
+    className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  },
+  VERIFIED: {
+    label: "Verified",
     className: "bg-emerald-100 text-emerald-800 border-emerald-200",
   },
   REVISI: {
@@ -34,8 +45,17 @@ const statusConfig: Record<
   },
 };
 
+const fallbackConfig = {
+  label: "Unknown",
+  className: "bg-muted text-muted-foreground border-border",
+};
+
 export function StatusBadge({ status, className }: StatusBadgeProps) {
-  const config = statusConfig[status];
+  const normalized = (status || "").toUpperCase();
+  const config = statusConfig[normalized] ?? {
+    label: status || fallbackConfig.label,
+    className: fallbackConfig.className,
+  };
 
   return (
     <span

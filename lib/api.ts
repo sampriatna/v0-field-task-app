@@ -225,18 +225,23 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
 
 export async function getTaskDetail(taskId: string): Promise<ApiResponse<Task>> {
   try {
-    const result = await callApi<Task>("getTaskDetail", { task_id: taskId }, "GET");
+    // GAS getTaskDetail requires the staff token, which the admin UI does not
+    // have from the URL alone. Instead, fetch the full task list (admin-scoped)
+    // and find the matching task — it already contains all fields we need.
+    const result = await getTasks();
 
-    if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(500);
-      const task = mockTasks.find((t) => t.task_id === taskId);
+    if (result.success && result.data) {
+      const task = result.data.find((t) => t.task_id === taskId);
       if (task) {
         return { success: true, data: task };
       }
       return { success: false, error: "Tugas tidak ditemukan" };
     }
 
-    return result;
+    return {
+      success: false,
+      error: result.error || "Gagal mengambil detail tugas",
+    };
   } catch (error) {
     return {
       success: false,

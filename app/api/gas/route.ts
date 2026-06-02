@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession, isAuthenticated } from "@/lib/auth";
 
-// ENV reload v3 - after Vercel dashboard update
-
 // Actions that require admin authentication
 const ADMIN_ACTIONS = [
   "createTask",
@@ -99,7 +97,9 @@ async function forwardToGas(
         { status: 500 }
       );
     }
+    // GAS requires both admin_secret and api_key fields
     finalPayload.admin_secret = adminApiKey;
+    finalPayload.api_key = adminApiKey;
   }
 
   try {

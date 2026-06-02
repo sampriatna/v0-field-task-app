@@ -1,4 +1,12 @@
-export type TaskStatus = "OPEN" | "SUBMITTED" | "DONE" | "REVISI" | "LATE";
+export type TaskStatus =
+  | "SENT"
+  | "OPEN"
+  | "OPENED"
+  | "SUBMITTED"
+  | "DONE"
+  | "VERIFIED"
+  | "REVISI"
+  | "LATE";
 
 export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
 
