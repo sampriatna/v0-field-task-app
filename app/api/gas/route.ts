@@ -43,7 +43,7 @@ const ADMIN_ACTIONS = [
   "generateRecurringTasks",
 ];
 
-// Actions that are public (staff report pages) - no admin_secret needed
+// Actions that are public (staff report pages) - no LOGIN needed, but still need admin_secret for GAS
 const PUBLIC_ACTIONS = [
   "healthCheck",
   "getTaskByToken",
@@ -53,6 +53,11 @@ const PUBLIC_ACTIONS = [
   "getChecklistByToken",
   "submitChecklistReport",
 ];
+
+// All non-healthCheck actions need admin_secret for GAS
+function needsAdminSecret(action: string): boolean {
+  return action !== "healthCheck";
+}
 
 function isAdminAction(action: string): boolean {
   return ADMIN_ACTIONS.includes(action);
@@ -252,8 +257,8 @@ export async function GET(request: Request) {
     }
   });
 
-  // Forward to GAS - include admin_secret only for admin actions
-  return forwardToGas(action, payload, "GET", isAdminAction(action));
+  // Forward to GAS - include admin_secret for all non-healthCheck actions
+  return forwardToGas(action, payload, "GET", needsAdminSecret(action));
 }
 
 // POST handler
@@ -288,8 +293,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // Forward to GAS - include admin_secret only for admin actions
-    return forwardToGas(action, payload, "POST", isAdminAction(action));
+    // Forward to GAS - include admin_secret for all non-healthCheck actions
+    return forwardToGas(action, payload, "POST", needsAdminSecret(action));
   } catch {
     return NextResponse.json(
       { success: false, error: "Invalid request body" },
