@@ -69,6 +69,61 @@ function normalizeTaskList(data: unknown): Task[] {
   return [];
 }
 
+// Normalize staff data from GAS (maps staff_name -> name, is_active -> status, etc.)
+function normalizeStaffFromGAS(gasStaff: Record<string, unknown>): Staff {
+  return {
+    staff_id: String(gasStaff.staff_id || ""),
+    name: String(gasStaff.staff_name || gasStaff.name || ""),
+    position: String(gasStaff.position || ""),
+    outlet: (gasStaff.outlet || "KBU") as Staff["outlet"],
+    area: (gasStaff.area || "Dapur") as Staff["area"],
+    wa_number: String(gasStaff.wa_number || ""),
+    role: (gasStaff.role || "STAFF") as Staff["role"],
+    status: gasStaff.is_active === "TRUE" || gasStaff.is_active === true || gasStaff.is_active === "ACTIVE" || gasStaff.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
+    created_at: String(gasStaff.created_at || ""),
+    updated_at: String(gasStaff.last_updated || gasStaff.updated_at || ""),
+  };
+}
+
+// Normalize staff list from GAS response
+function normalizeStaffList(data: unknown): Staff[] {
+  if (!data) return [];
+  
+  let rawList: Record<string, unknown>[] = [];
+  
+  if (Array.isArray(data)) {
+    rawList = data as Record<string, unknown>[];
+  } else if (typeof data === "object" && data !== null) {
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.staff)) rawList = obj.staff as Record<string, unknown>[];
+    else if (Array.isArray(obj.data)) rawList = obj.data as Record<string, unknown>[];
+    else if (Array.isArray(obj.rows)) rawList = obj.rows as Record<string, unknown>[];
+  }
+  
+  return rawList.map(normalizeStaffFromGAS);
+}
+
+// Convert frontend staff payload to GAS format
+function staffPayloadToGAS(payload: CreateStaffPayload | UpdateStaffPayload): Record<string, unknown> {
+  const gasPayload: Record<string, unknown> = {
+    staff_name: payload.name,
+    wa_number: payload.wa_number,
+    outlet: payload.outlet,
+    role: payload.role,
+    // Optional fields - only include if they exist
+  };
+  
+  if ("staff_id" in payload) {
+    gasPayload.staff_id = payload.staff_id;
+  }
+  
+  // Include position and area if GAS supports them
+  if (payload.position) gasPayload.position = payload.position;
+  if (payload.area) gasPayload.area = payload.area;
+  
+  return gasPayload;
+}
+
 // Build the correct staff report link for the frontend route /report/[taskId]?token=
 export function buildReportLink(taskId: string, token: string, origin?: string): string {
   const base =
@@ -771,7 +826,7 @@ const mockStaff: Staff[] = [
 
 export async function getStaff(filters?: { outlet?: string; status?: string }): Promise<ApiResponse<Staff[]>> {
   try {
-    const result = await callApi<Staff[]>("getStaff", filters as Record<string, string>, "GET");
+    const result = await callApi<unknown>("getStaff", filters as Record<string, string>, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(500);
@@ -785,22 +840,23 @@ export async function getStaff(filters?: { outlet?: string; status?: string }): 
       return { success: true, data: staff };
     }
 
-    // Normalize response - GAS might return in different formats
+    // Normalize response using the staff normalizer
     if (result.success && result.data) {
-      const data = result.data as unknown;
-      if (Array.isArray(data)) {
-        return { success: true, data: data as Staff[] };
+      const normalized = normalizeStaffList(result.data);
+      
+      // Apply filters if needed (in case GAS doesn't filter)
+      let filtered = normalized;
+      if (filters?.outlet) {
+        filtered = filtered.filter(s => s.outlet === filters.outlet);
       }
-      if (typeof data === "object" && data !== null) {
-        const obj = data as Record<string, unknown>;
-        if (Array.isArray(obj.staff)) return { success: true, data: obj.staff as Staff[] };
-        if (Array.isArray(obj.data)) return { success: true, data: obj.data as Staff[] };
-        if (Array.isArray(obj.rows)) return { success: true, data: obj.rows as Staff[] };
+      if (filters?.status) {
+        filtered = filtered.filter(s => s.status === filters.status);
       }
-      return { success: true, data: [] };
+      
+      return { success: true, data: filtered };
     }
 
-    return result;
+    return { success: true, data: [] };
   } catch (error) {
     return {
       success: false,
@@ -811,7 +867,9 @@ export async function getStaff(filters?: { outlet?: string; status?: string }): 
 
 export async function createStaff(payload: CreateStaffPayload): Promise<ApiResponse<Staff>> {
   try {
-    const result = await callApi<Staff>("createStaff", payload as unknown as Record<string, unknown>);
+    // Convert frontend field names to GAS field names
+    const gasPayload = staffPayloadToGAS(payload);
+    const result = await callApi<Record<string, unknown>>("createStaff", gasPayload);
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(1000);
@@ -825,7 +883,12 @@ export async function createStaff(payload: CreateStaffPayload): Promise<ApiRespo
       return { success: true, data: newStaff };
     }
 
-    return result;
+    // Normalize response from GAS
+    if (result.success && result.data) {
+      return { success: true, data: normalizeStaffFromGAS(result.data) };
+    }
+
+    return { success: false, error: result.error || "Gagal menambah staff" };
   } catch (error) {
     return {
       success: false,
@@ -836,7 +899,9 @@ export async function createStaff(payload: CreateStaffPayload): Promise<ApiRespo
 
 export async function updateStaff(payload: UpdateStaffPayload): Promise<ApiResponse<Staff>> {
   try {
-    const result = await callApi<Staff>("updateStaff", payload as unknown as Record<string, unknown>);
+    // Convert frontend field names to GAS field names
+    const gasPayload = staffPayloadToGAS(payload);
+    const result = await callApi<Record<string, unknown>>("updateStaff", gasPayload);
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(1000);
@@ -849,7 +914,12 @@ export async function updateStaff(payload: UpdateStaffPayload): Promise<ApiRespo
       return { success: true, data: updatedStaff };
     }
 
-    return result;
+    // Normalize response from GAS
+    if (result.success && result.data) {
+      return { success: true, data: normalizeStaffFromGAS(result.data) };
+    }
+
+    return { success: false, error: result.error || "Gagal mengupdate staff" };
   } catch (error) {
     return {
       success: false,
