@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import { Camera, X, Image as ImageIcon } from "lucide-react";
+import { Camera, X, CheckCircle2, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -11,6 +11,7 @@ interface PhotoUploaderProps {
   value?: string;
   onChange: (base64: string | undefined) => void;
   className?: string;
+  size?: "default" | "large";
 }
 
 export function PhotoUploader({
@@ -19,12 +20,13 @@ export function PhotoUploader({
   value,
   onChange,
   className,
+  size = "default",
 }: PhotoUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleFileChange = useCallback(
-    (file: File | undefined) => {
+    async (file: File | undefined) => {
       if (!file) {
         onChange(undefined);
         return;
@@ -42,10 +44,17 @@ export function PhotoUploader({
         return;
       }
 
+      setIsProcessing(true);
+
       const reader = new FileReader();
       reader.onload = (e) => {
         const base64 = e.target?.result as string;
         onChange(base64);
+        setIsProcessing(false);
+      };
+      reader.onerror = () => {
+        alert("Gagal membaca foto. Coba lagi.");
+        setIsProcessing(false);
       };
       reader.readAsDataURL(file);
     },
@@ -57,22 +66,6 @@ export function PhotoUploader({
     handleFileChange(file);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    handleFileChange(file);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
   const clearPhoto = () => {
     onChange(undefined);
     if (inputRef.current) {
@@ -80,12 +73,17 @@ export function PhotoUploader({
     }
   };
 
+  const isLarge = size === "large";
+
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("space-y-3", className)}>
       {label && (
-        <label className="block text-sm font-medium text-foreground">
+        <label className={cn(
+          "block font-semibold text-foreground",
+          isLarge ? "text-lg" : "text-sm"
+        )}>
           {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
+          {required && <span className="text-destructive ml-1">*</span>}
         </label>
       )}
 
@@ -98,50 +96,83 @@ export function PhotoUploader({
         className="hidden"
       />
 
-      {value ? (
-        <div className="relative rounded-lg overflow-hidden border border-border">
-          <img
-            src={value}
-            alt="Preview"
-            className="w-full h-48 object-cover"
-          />
+      {isProcessing ? (
+        <div className={cn(
+          "border-2 border-dashed border-primary rounded-xl flex flex-col items-center justify-center bg-primary/5",
+          isLarge ? "min-h-[250px]" : "min-h-[180px]"
+        )}>
+          <div className="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent" />
+          <p className="text-primary font-medium mt-4">Memproses foto...</p>
+        </div>
+      ) : value ? (
+        // Photo Preview - Large and Clear
+        <div className="space-y-3">
+          <div className="relative rounded-xl overflow-hidden border-2 border-success bg-success/5">
+            <img
+              src={value}
+              alt="Preview foto"
+              className={cn(
+                "w-full object-cover",
+                isLarge ? "max-h-[300px]" : "max-h-[200px]"
+              )}
+            />
+            {/* Success indicator */}
+            <div className="absolute top-3 left-3 bg-success text-success-foreground px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4" />
+              Foto siap
+            </div>
+          </div>
+          
+          {/* Retake button - Large touch target */}
           <Button
             type="button"
-            variant="destructive"
-            size="icon"
-            className="absolute top-2 right-2 h-8 w-8"
+            variant="outline"
             onClick={clearPhoto}
+            className={cn(
+              "w-full font-semibold",
+              isLarge ? "h-14 text-base" : "h-12"
+            )}
           >
-            <X className="h-4 w-4" />
+            <RefreshCcw className="w-5 h-5 mr-2" />
+            Ganti Foto
           </Button>
         </div>
       ) : (
-        <div
+        // Upload Button - Super Large and Clear
+        <button
+          type="button"
           onClick={() => inputRef.current?.click()}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
           className={cn(
-            "border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors",
-            isDragging
-              ? "border-primary bg-primary/5"
-              : "border-border hover:border-primary/50 hover:bg-muted/50"
+            "w-full border-2 border-dashed rounded-xl transition-all active:scale-[0.98]",
+            "flex flex-col items-center justify-center gap-4",
+            "border-primary/50 bg-primary/5 hover:bg-primary/10 hover:border-primary",
+            isLarge ? "min-h-[220px] p-8" : "min-h-[160px] p-6"
           )}
         >
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-              <Camera className="w-6 h-6 text-muted-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                Ketuk untuk ambil foto
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                atau seret file ke sini
-              </p>
-            </div>
+          <div className={cn(
+            "rounded-full bg-primary/20 flex items-center justify-center",
+            isLarge ? "w-20 h-20" : "w-14 h-14"
+          )}>
+            <Camera className={cn(
+              "text-primary",
+              isLarge ? "w-10 h-10" : "w-7 h-7"
+            )} />
           </div>
-        </div>
+          <div className="text-center">
+            <p className={cn(
+              "font-bold text-foreground",
+              isLarge ? "text-xl" : "text-base"
+            )}>
+              KETUK UNTUK AMBIL FOTO
+            </p>
+            <p className={cn(
+              "text-muted-foreground mt-1",
+              isLarge ? "text-base" : "text-sm"
+            )}>
+              Arahkan kamera ke objek
+            </p>
+          </div>
+        </button>
       )}
     </div>
   );

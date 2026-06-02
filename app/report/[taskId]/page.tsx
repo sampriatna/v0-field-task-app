@@ -4,20 +4,20 @@ import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   CheckCircle2,
   Clock,
-  MapPin,
-  AlertCircle,
+  AlertTriangle,
+  Send,
+  ChevronDown,
+  ChevronUp,
   Image as ImageIcon,
 } from "lucide-react";
 import { getTaskByToken, markOpened, submitTaskReport } from "@/lib/api";
 import type { Task } from "@/lib/types";
 
-type PageState = "loading" | "error" | "form" | "success";
+type PageState = "loading" | "error" | "form" | "submitting" | "success";
 
 export default function StaffReportPage() {
   const params = useParams();
@@ -32,15 +32,16 @@ export default function StaffReportPage() {
 
   const [afterPhoto, setAfterPhoto] = useState<string | undefined>();
   const [staffNote, setStaffNote] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   useEffect(() => {
     loadTask();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId, token]);
 
   const loadTask = async () => {
     if (!taskId || !token) {
-      setErrorMessage("Link tugas tidak valid. Hubungi leader Anda.");
+      setErrorMessage("Link tidak valid.\nHubungi atasan Anda.");
       setPageState("error");
       return;
     }
@@ -56,23 +57,23 @@ export default function StaffReportPage() {
         await markOpened(taskId, token);
       } else {
         setErrorMessage(
-          result.error || "Link tugas tidak valid. Hubungi leader Anda."
+          result.error || "Link tidak valid.\nHubungi atasan Anda."
         );
         setPageState("error");
       }
-    } catch (error) {
-      setErrorMessage("Gagal memuat data tugas. Coba lagi nanti.");
+    } catch {
+      setErrorMessage("Gagal memuat tugas.\nPeriksa koneksi internet Anda.");
       setPageState("error");
     }
   };
 
   const handleSubmit = async () => {
     if (!afterPhoto) {
-      alert("Harap upload foto bukti selesai");
+      alert("HARAP UPLOAD FOTO BUKTI SELESAI");
       return;
     }
 
-    setIsSubmitting(true);
+    setPageState("submitting");
 
     try {
       const result = await submitTaskReport({
@@ -85,192 +86,267 @@ export default function StaffReportPage() {
       if (result.success) {
         setPageState("success");
       } else {
-        alert(result.error || "Gagal mengirim laporan. Coba lagi.");
+        setPageState("form");
+        alert(result.error || "Gagal mengirim. Coba lagi.");
       }
-    } catch (error) {
-      alert("Gagal mengirim laporan. Coba lagi.");
-    } finally {
-      setIsSubmitting(false);
+    } catch {
+      setPageState("form");
+      alert("Gagal mengirim. Periksa koneksi internet.");
     }
   };
 
-  // Loading State
+  // ===================
+  // LOADING STATE
+  // ===================
   if (pageState === "loading") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto" />
-          <p className="text-muted-foreground">Memuat data tugas...</p>
-        </div>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary border-t-transparent" />
+        <p className="text-xl font-medium text-foreground mt-6">
+          Memuat Tugas...
+        </p>
+        <p className="text-muted-foreground mt-2">Harap tunggu sebentar</p>
       </div>
     );
   }
 
-  // Error State
+  // ===================
+  // ERROR STATE
+  // ===================
   if (pageState === "error") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="w-16 h-16 rounded-full bg-red-100 mx-auto flex items-center justify-center">
-            <AlertCircle className="w-8 h-8 text-red-600" />
-          </div>
-          <h2 className="text-xl font-semibold text-foreground">
-            Tugas Tidak Ditemukan
-          </h2>
-          <p className="text-muted-foreground">{errorMessage}</p>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <div className="w-24 h-24 rounded-full bg-destructive/10 flex items-center justify-center">
+          <AlertTriangle className="w-12 h-12 text-destructive" />
+        </div>
+        <h1 className="text-2xl font-bold text-foreground mt-6 text-center">
+          Tugas Tidak Ditemukan
+        </h1>
+        <p className="text-lg text-muted-foreground mt-3 text-center whitespace-pre-line">
+          {errorMessage}
+        </p>
+        <Button
+          onClick={loadTask}
+          variant="outline"
+          size="lg"
+          className="mt-8 h-14 px-8 text-lg"
+        >
+          Coba Lagi
+        </Button>
+      </div>
+    );
+  }
+
+  // ===================
+  // SUBMITTING STATE
+  // ===================
+  if (pageState === "submitting") {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+        <div className="animate-spin rounded-full h-20 w-20 border-4 border-primary border-t-transparent" />
+        <p className="text-2xl font-bold text-foreground mt-8">
+          Mengirim Laporan...
+        </p>
+        <p className="text-lg text-muted-foreground mt-3 text-center">
+          Harap tunggu, jangan tutup halaman ini
+        </p>
+        <div className="mt-6 flex items-center gap-2 text-muted-foreground">
+          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <span>Mengupload foto...</span>
         </div>
       </div>
     );
   }
 
-  // Success State
+  // ===================
+  // SUCCESS STATE
+  // ===================
   if (pageState === "success") {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center space-y-4 max-w-sm">
-          <div className="w-20 h-20 rounded-full bg-emerald-100 mx-auto flex items-center justify-center">
-            <CheckCircle2 className="w-10 h-10 text-emerald-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-foreground">
-            Laporan Berhasil Dikirim
-          </h2>
-          <p className="text-muted-foreground text-lg">
-            Terima kasih sudah menyelesaikan tugas ini.
+      <div className="min-h-screen bg-success/5 flex flex-col items-center justify-center p-6">
+        <div className="w-28 h-28 rounded-full bg-success/20 flex items-center justify-center animate-bounce">
+          <CheckCircle2 className="w-16 h-16 text-success" />
+        </div>
+        <h1 className="text-3xl font-bold text-foreground mt-8 text-center">
+          BERHASIL!
+        </h1>
+        <p className="text-xl text-muted-foreground mt-4 text-center">
+          Laporan Anda sudah terkirim
+        </p>
+        <div className="mt-8 p-4 bg-card rounded-xl border border-border text-center">
+          <p className="text-muted-foreground">
+            Atasan Anda akan memeriksa laporan ini.
           </p>
-          <p className="text-sm text-muted-foreground">
-            Leader akan segera memeriksa laporan Anda.
+          <p className="text-sm text-muted-foreground mt-2">
+            Anda bisa menutup halaman ini.
           </p>
         </div>
       </div>
     );
   }
 
-  // Form State
+  // ===================
+  // FORM STATE - Main UI for Staff
+  // ===================
   const deadlineDate = task ? new Date(task.deadline) : new Date();
-  const isOverdue = new Date() > deadlineDate;
+  const now = new Date();
+  const isOverdue = now > deadlineDate;
+  
+  // Calculate time remaining
+  const timeDiff = deadlineDate.getTime() - now.getTime();
+  const hoursRemaining = Math.floor(timeDiff / (1000 * 60 * 60));
+  const minutesRemaining = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Simple Header for Staff */}
-      <header className="bg-primary text-primary-foreground p-4">
-        <h1 className="text-lg font-semibold text-center">
-          Laporan Selesai Tugas
-        </h1>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* HEADER - Simple, No Navigation */}
+      <header className="bg-primary text-primary-foreground p-4 text-center shrink-0">
+        <h1 className="text-lg font-bold">LAPORAN TUGAS</h1>
       </header>
 
-      <div className="p-4 space-y-4 pb-24 max-w-lg mx-auto">
-        {/* Task Info Card */}
-        <Card className="p-4 space-y-3">
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-xs text-muted-foreground font-mono">
-                {task?.task_id}
-              </span>
-              <h2 className="text-lg font-bold text-foreground mt-1">
-                {task?.task_title}
-              </h2>
-            </div>
+      {/* DEADLINE BANNER - Very Prominent */}
+      <div className={`p-4 ${isOverdue ? 'bg-destructive/10 border-b-2 border-destructive' : 'bg-warning/10 border-b-2 border-warning'}`}>
+        <div className="flex items-center justify-center gap-3">
+          <Clock className={`w-6 h-6 ${isOverdue ? 'text-destructive' : 'text-warning-foreground'}`} />
+          <div className="text-center">
+            {isOverdue ? (
+              <>
+                <p className="text-lg font-bold text-destructive">TERLAMBAT!</p>
+                <p className="text-sm text-destructive/80">Segera selesaikan tugas ini</p>
+              </>
+            ) : (
+              <>
+                <p className="text-base font-bold text-warning-foreground">
+                  Deadline: {deadlineDate.toLocaleDateString("id-ID", {
+                    weekday: "short",
+                    day: "numeric",
+                    month: "short",
+                  })}{" "}
+                  {deadlineDate.toLocaleTimeString("id-ID", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+                <p className="text-sm text-warning-foreground/80">
+                  Sisa waktu: {hoursRemaining > 0 ? `${hoursRemaining} jam ` : ""}{minutesRemaining} menit
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* MAIN CONTENT - Scrollable */}
+      <div className="flex-1 overflow-auto">
+        <div className="p-4 space-y-5 max-w-lg mx-auto pb-32">
+          {/* TASK TITLE - Large and Clear */}
+          <div className="bg-card rounded-xl p-4 border border-border">
+            <p className="text-xs text-muted-foreground font-mono mb-1">
+              {task?.task_id}
+            </p>
+            <h2 className="text-xl font-bold text-foreground leading-tight">
+              {task?.task_title}
+            </h2>
+            <p className="text-base text-muted-foreground mt-2">
+              {task?.outlet} - {task?.area}
+            </p>
           </div>
 
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="w-4 h-4 shrink-0" />
-              <span>
-                {task?.outlet} - {task?.area}
-              </span>
-            </div>
-            <div
-              className={`flex items-center gap-2 ${
-                isOverdue ? "text-red-600 font-medium" : "text-muted-foreground"
-              }`}
+          {/* TASK INSTRUCTIONS - Collapsible for simplicity */}
+          <div className="bg-card rounded-xl border border-border overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowDetails(!showDetails)}
+              className="w-full p-4 flex items-center justify-between text-left"
             >
-              <Clock className="w-4 h-4 shrink-0" />
-              <span>
-                Deadline:{" "}
-                {deadlineDate.toLocaleDateString("id-ID", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                })}{" "}
-                {deadlineDate.toLocaleTimeString("id-ID", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+              <span className="font-semibold text-foreground">
+                Lihat Instruksi Tugas
               </span>
-            </div>
+              {showDetails ? (
+                <ChevronUp className="w-5 h-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-muted-foreground" />
+              )}
+            </button>
+            
+            {showDetails && (
+              <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
+                {/* Instructions */}
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">
+                    INSTRUKSI:
+                  </p>
+                  <p className="text-base text-foreground whitespace-pre-wrap leading-relaxed">
+                    {task?.task_description}
+                  </p>
+                </div>
+
+                {/* Before Photo */}
+                {task?.before_photo_url && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4" />
+                      FOTO SEBELUM:
+                    </p>
+                    <img
+                      src={task.before_photo_url}
+                      alt="Foto sebelum"
+                      className="w-full rounded-lg border border-border"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Task Description */}
-          <div className="pt-2 border-t border-border">
-            <p className="text-sm font-medium text-foreground mb-1">
-              Instruksi:
-            </p>
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-              {task?.task_description}
-            </p>
+          {/* PHOTO UPLOAD - Large and Prominent */}
+          <div className="bg-card rounded-xl p-4 border border-border">
+            <PhotoUploader
+              label="UPLOAD FOTO BUKTI SELESAI"
+              required
+              value={afterPhoto}
+              onChange={setAfterPhoto}
+              size="large"
+            />
           </div>
 
-          {/* Before Photo */}
-          {task?.before_photo_url && (
-            <div className="pt-2 border-t border-border">
-              <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
-                <ImageIcon className="w-4 h-4" />
-                Foto Sebelum:
-              </p>
-              <img
-                src={task.before_photo_url}
-                alt="Foto sebelum"
-                className="w-full rounded-lg border border-border"
-              />
-            </div>
-          )}
-        </Card>
-
-        {/* Report Form */}
-        <Card className="p-4 space-y-4">
-          <h3 className="font-semibold text-foreground text-lg">
-            Kirim Bukti Selesai
-          </h3>
-
-          <PhotoUploader
-            label="Foto Bukti Selesai"
-            required
-            value={afterPhoto}
-            onChange={setAfterPhoto}
-          />
-
-          <div className="space-y-2">
-            <Label>Catatan (opsional)</Label>
+          {/* OPTIONAL NOTE - Simple */}
+          <div className="bg-card rounded-xl p-4 border border-border">
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
+              Catatan (tidak wajib)
+            </label>
             <Textarea
               placeholder="Tulis catatan jika ada..."
               value={staffNote}
               onChange={(e) => setStaffNote(e.target.value)}
-              rows={3}
+              rows={2}
+              className="text-base"
             />
           </div>
-        </Card>
+        </div>
       </div>
 
-      {/* Fixed Submit Button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t border-border">
+      {/* FIXED SUBMIT BUTTON - Super Large */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t-2 border-border shadow-lg">
         <div className="max-w-lg mx-auto">
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !afterPhoto}
-            className="w-full h-14 text-lg font-semibold"
+            disabled={!afterPhoto}
+            size="lg"
+            className={`w-full h-16 text-xl font-bold transition-all ${
+              afterPhoto 
+                ? 'bg-success hover:bg-success/90 text-success-foreground' 
+                : 'bg-muted text-muted-foreground'
+            }`}
           >
-            {isSubmitting ? (
-              <span className="flex items-center gap-2">
-                <span className="animate-spin rounded-full h-5 w-5 border-2 border-current border-t-transparent" />
-                Mengirim...
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <CheckCircle2 className="w-6 h-6" />
-                Saya Sudah Selesai
-              </span>
-            )}
+            <Send className="w-6 h-6 mr-3" />
+            {afterPhoto ? "KIRIM LAPORAN" : "UPLOAD FOTO DULU"}
           </Button>
+          {!afterPhoto && (
+            <p className="text-center text-sm text-muted-foreground mt-2">
+              Ambil foto bukti selesai untuk mengirim laporan
+            </p>
+          )}
         </div>
       </div>
     </div>
