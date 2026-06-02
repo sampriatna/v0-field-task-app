@@ -2,47 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ClipboardCheck, LogIn, User } from "lucide-react";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { ClipboardCheck, LogIn, Shield } from "lucide-react";
+import Link from "next/link";
 
 export default function HomePage() {
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
-  const [name, setName] = useState("");
-  const router = useRouter();
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-
-    setIsLoggingIn(true);
-    // Simulate login delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    // Store user in localStorage for MVP
-    localStorage.setItem(
-      "nusa_user",
-      JSON.stringify({ name: name.trim(), role: "admin" })
-    );
-
-    router.push("/dashboard");
-  };
-
-  const handleQuickAccess = async () => {
-    setIsLoggingIn(true);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    localStorage.setItem(
-      "nusa_user",
-      JSON.stringify({ name: "Admin", role: "admin" })
-    );
-
-    router.push("/dashboard");
-  };
-
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
       <div className="w-full max-w-sm space-y-8">
@@ -70,95 +33,34 @@ export default function HomePage() {
           <span>Samtaro</span>
         </div>
 
-        {/* Login Card */}
-        <Card className="p-6">
-          {!showLogin ? (
-            <div className="space-y-4">
-              <Button
-                onClick={handleQuickAccess}
-                className="w-full h-12 text-base"
-                disabled={isLoggingIn}
-              >
-                {isLoggingIn ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-                    Masuk...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <LogIn className="w-5 h-5" />
-                    Masuk ke Dashboard
-                  </span>
-                )}
-              </Button>
+        {/* Main Card */}
+        <Card className="p-6 space-y-6">
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              Sistem operasional internal untuk manajemen tugas lapangan
+            </p>
+          </div>
 
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">
-                    atau
-                  </span>
-                </div>
-              </div>
+          <div className="space-y-3">
+            <Button asChild className="w-full h-12 text-base">
+              <Link href="/login">
+                <LogIn className="w-5 h-5 mr-2" />
+                Masuk ke Dashboard
+              </Link>
+            </Button>
+          </div>
 
-              <Button
-                variant="outline"
-                onClick={() => setShowLogin(true)}
-                className="w-full h-12"
-              >
-                <User className="w-4 h-4 mr-2" />
-                Login dengan Nama
-              </Button>
-            </div>
-          ) : (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nama Pengguna</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Masukkan nama Anda"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  autoFocus
-                  disabled={isLoggingIn}
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowLogin(false)}
-                  disabled={isLoggingIn}
-                  className="flex-1"
-                >
-                  Batal
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isLoggingIn || !name.trim()}
-                  className="flex-1"
-                >
-                  {isLoggingIn ? (
-                    <span className="flex items-center gap-2">
-                      <span className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-                      Masuk...
-                    </span>
-                  ) : (
-                    "Masuk"
-                  )}
-                </Button>
-              </div>
-            </form>
-          )}
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+            <Shield className="w-4 h-4 flex-shrink-0" />
+            <span>
+              Staff mengakses tugas melalui link WhatsApp yang dikirim otomatis
+            </span>
+          </div>
         </Card>
 
-        {/* Info Text */}
+        {/* Footer */}
         <p className="text-center text-xs text-muted-foreground">
-          Sistem operasional internal untuk manajemen tugas lapangan
+          Nusa Food Group - Internal System
         </p>
       </div>
     </main>

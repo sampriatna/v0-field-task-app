@@ -22,62 +22,51 @@ import {
   mockChecklistItems,
 } from "./mock-data";
 
-const GAS_URL_KEY = "nusa_gas_web_app_url";
-const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbz7VvBRsFg-6Nkfc-P1zqRAHB1T7xjcA2z3b-TShsKicZIz1NqmDJ2hnvxDWOx_YzM/exec";
+// Internal API endpoint - no longer expose GAS URL directly
+const API_BASE = "/api/gas";
 
-function getGasUrl(): string {
-  if (typeof window === "undefined") return DEFAULT_GAS_URL;
-  return localStorage.getItem(GAS_URL_KEY) || DEFAULT_GAS_URL;
-}
-
-export function setGasUrl(url: string): void {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(GAS_URL_KEY, url);
-  }
-}
-
-export function getStoredGasUrl(): string {
-  return getGasUrl();
-}
-
-function isGasConfigured(): boolean {
-  const url = getGasUrl();
-  return url.includes("script.google.com") && !url.includes("PASTE_GAS_URL_HERE");
-}
-
-async function callGas<T>(
+async function callApi<T>(
   action: string,
   payload?: Record<string, unknown>,
   method: "GET" | "POST" = "POST"
 ): Promise<ApiResponse<T>> {
-  const url = getGasUrl();
-
-  if (!isGasConfigured()) {
-    // Return mock data if GAS is not configured
-    return { success: false, error: "GAS_NOT_CONFIGURED" };
-  }
-
   try {
     let response: Response;
 
     if (method === "GET") {
       const params = new URLSearchParams({ action, ...payload } as Record<string, string>);
-      response = await fetch(`${url}?${params.toString()}`, {
+      response = await fetch(`${API_BASE}?${params.toString()}`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
       });
     } else {
-      response = await fetch(url, {
+      response = await fetch(API_BASE, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ action, ...payload }),
       });
     }
 
+    // Handle 401 - redirect to login
+    if (response.status === 401) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return { success: false, error: "Sesi telah berakhir. Silakan login kembali." };
+    }
+
     const data = await response.json();
+    
+    // Check for GAS_NOT_CONFIGURED error
+    if (data.error === "GAS_NOT_CONFIGURED") {
+      return { success: false, error: "GAS_NOT_CONFIGURED" };
+    }
+
     return { success: true, data };
   } catch (error) {
-    console.error("GAS API Error:", error);
+    console.error("API Error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Terjadi kesalahan saat menghubungi server",
@@ -92,7 +81,7 @@ function delay(ms: number): Promise<void> {
 
 export async function createTask(payload: CreateTaskPayload): Promise<ApiResponse<Task>> {
   try {
-    const result = await callGas<Task>("createTask", payload as unknown as Record<string, unknown>);
+    const result = await callApi<Task>("createTask", payload as unknown as Record<string, unknown>);
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       // Mock response
@@ -126,7 +115,7 @@ export async function getTaskByToken(
   token: string
 ): Promise<ApiResponse<Task>> {
   try {
-    const result = await callGas<Task>(
+    const result = await callApi<Task>(
       "getTaskByToken",
       { task_id: taskId, token },
       "GET"
@@ -152,7 +141,7 @@ export async function getTaskByToken(
 
 export async function markOpened(taskId: string, token: string): Promise<ApiResponse<void>> {
   try {
-    const result = await callGas<void>("markOpened", { task_id: taskId, token });
+    const result = await callApi<void>("markOpened", { task_id: taskId, token });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(200);
@@ -172,7 +161,7 @@ export async function submitTaskReport(
   payload: SubmitReportPayload
 ): Promise<ApiResponse<void>> {
   try {
-    const result = await callGas<void>(
+    const result = await callApi<void>(
       "submitTaskReport",
       payload as unknown as Record<string, unknown>
     );
@@ -193,7 +182,7 @@ export async function submitTaskReport(
 
 export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[]>> {
   try {
-    const result = await callGas<Task[]>(
+    const result = await callApi<Task[]>(
       "getTasks",
       filters as unknown as Record<string, unknown>,
       "GET"
@@ -229,7 +218,7 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
 
 export async function getTaskDetail(taskId: string): Promise<ApiResponse<Task>> {
   try {
-    const result = await callGas<Task>("getTaskDetail", { task_id: taskId }, "GET");
+    const result = await callApi<Task>("getTaskDetail", { task_id: taskId }, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(500);
@@ -251,7 +240,7 @@ export async function getTaskDetail(taskId: string): Promise<ApiResponse<Task>> 
 
 export async function getDashboardSummary(): Promise<ApiResponse<DashboardSummary>> {
   try {
-    const result = await callGas<DashboardSummary>("getDashboardSummary", undefined, "GET");
+    const result = await callApi<DashboardSummary>("getDashboardSummary", undefined, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(300);
@@ -274,7 +263,7 @@ export async function verifyTask(
 ): Promise<ApiResponse<void>> {
   try {
     const action = status === "approved" ? "verifyTask" : "requestRevision";
-    const result = await callGas<void>(action, { task_id: taskId, note });
+    const result = await callApi<void>(action, { task_id: taskId, note });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(800);
@@ -292,7 +281,7 @@ export async function verifyTask(
 
 export async function resendWhatsApp(taskId: string): Promise<ApiResponse<void>> {
   try {
-    const result = await callGas<void>("resendWhatsApp", { task_id: taskId });
+    const result = await callApi<void>("resendWhatsApp", { task_id: taskId });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(1000);
@@ -314,7 +303,7 @@ export async function resendWhatsApp(taskId: string): Promise<ApiResponse<void>>
 
 export async function getRecurringTemplates(): Promise<ApiResponse<RecurringTemplate[]>> {
   try {
-    const result = await callGas<RecurringTemplate[]>("getRecurringTemplates", undefined, "GET");
+    const result = await callApi<RecurringTemplate[]>("getRecurringTemplates", undefined, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(500);
@@ -332,7 +321,7 @@ export async function getRecurringTemplates(): Promise<ApiResponse<RecurringTemp
 
 export async function getRecurringTemplate(templateId: string): Promise<ApiResponse<RecurringTemplate>> {
   try {
-    const result = await callGas<RecurringTemplate>("getRecurringTemplate", { template_id: templateId }, "GET");
+    const result = await callApi<RecurringTemplate>("getRecurringTemplate", { template_id: templateId }, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(300);
@@ -356,7 +345,7 @@ export async function createRecurringTemplate(
   payload: CreateRecurringTemplatePayload
 ): Promise<ApiResponse<RecurringTemplate>> {
   try {
-    const result = await callGas<RecurringTemplate>(
+    const result = await callApi<RecurringTemplate>(
       "createRecurringTemplate",
       payload as unknown as Record<string, unknown>
     );
@@ -387,7 +376,7 @@ export async function updateRecurringTemplate(
   payload: UpdateRecurringTemplatePayload
 ): Promise<ApiResponse<RecurringTemplate>> {
   try {
-    const result = await callGas<RecurringTemplate>(
+    const result = await callApi<RecurringTemplate>(
       "updateRecurringTemplate",
       payload as unknown as Record<string, unknown>
     );
@@ -419,7 +408,7 @@ export async function toggleRecurringTemplateStatus(
   active: boolean
 ): Promise<ApiResponse<void>> {
   try {
-    const result = await callGas<void>("toggleRecurringTemplateStatus", { 
+    const result = await callApi<void>("toggleRecurringTemplateStatus", { 
       template_id: templateId, 
       active 
     });
@@ -444,7 +433,7 @@ export async function toggleRecurringTemplateStatus(
 
 export async function getChecklistItems(templateId: string): Promise<ApiResponse<ChecklistItem[]>> {
   try {
-    const result = await callGas<ChecklistItem[]>("getChecklistItems", { template_id: templateId }, "GET");
+    const result = await callApi<ChecklistItem[]>("getChecklistItems", { template_id: templateId }, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(300);
@@ -466,7 +455,7 @@ export async function saveChecklistItems(
   items: Omit<ChecklistItem, "checklist_item_id" | "template_id">[]
 ): Promise<ApiResponse<ChecklistItem[]>> {
   try {
-    const result = await callGas<ChecklistItem[]>("saveChecklistItems", {
+    const result = await callApi<ChecklistItem[]>("saveChecklistItems", {
       template_id: templateId,
       items,
     });
@@ -499,7 +488,7 @@ export async function getChecklistByToken(
   token: string
 ): Promise<ApiResponse<ChecklistReport>> {
   try {
-    const result = await callGas<ChecklistReport>(
+    const result = await callApi<ChecklistReport>(
       "getChecklistByToken",
       { task_id: taskId, token },
       "GET"
@@ -529,7 +518,7 @@ export async function submitChecklistReport(
   payload: SubmitChecklistPayload
 ): Promise<ApiResponse<void>> {
   try {
-    const result = await callGas<void>(
+    const result = await callApi<void>(
       "submitChecklistReport",
       payload as unknown as Record<string, unknown>
     );
@@ -552,7 +541,7 @@ export async function getChecklistReports(
   filters?: { outlet?: string; status?: string }
 ): Promise<ApiResponse<ChecklistReport[]>> {
   try {
-    const result = await callGas<ChecklistReport[]>(
+    const result = await callApi<ChecklistReport[]>(
       "getChecklistReports",
       filters as unknown as Record<string, unknown>,
       "GET"
@@ -583,7 +572,7 @@ export async function getChecklistReports(
 
 export async function getChecklistDetail(taskId: string): Promise<ApiResponse<ChecklistReport>> {
   try {
-    const result = await callGas<ChecklistReport>("getChecklistDetail", { task_id: taskId }, "GET");
+    const result = await callApi<ChecklistReport>("getChecklistDetail", { task_id: taskId }, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(500);
@@ -605,7 +594,7 @@ export async function getChecklistDetail(taskId: string): Promise<ApiResponse<Ch
 
 export async function getChecklistSummary(): Promise<ApiResponse<ChecklistSummary>> {
   try {
-    const result = await callGas<ChecklistSummary>("getChecklistSummary", undefined, "GET");
+    const result = await callApi<ChecklistSummary>("getChecklistSummary", undefined, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(300);
@@ -628,7 +617,7 @@ export async function verifyChecklist(
 ): Promise<ApiResponse<void>> {
   try {
     const action = status === "approved" ? "approveChecklist" : "requestChecklistRevision";
-    const result = await callGas<void>(action, { task_id: taskId, note });
+    const result = await callApi<void>(action, { task_id: taskId, note });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(800);
@@ -646,7 +635,7 @@ export async function verifyChecklist(
 
 export async function resendChecklistWhatsApp(taskId: string): Promise<ApiResponse<void>> {
   try {
-    const result = await callGas<void>("resendChecklistWhatsApp", { task_id: taskId });
+    const result = await callApi<void>("resendChecklistWhatsApp", { task_id: taskId });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(1000);

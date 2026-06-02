@@ -15,15 +15,19 @@ import {
   Users,
   Building2,
   Layers,
+  LogOut,
 } from "lucide-react";
 import { setGasUrl, getStoredGasUrl } from "@/lib/api";
 import { outlets, areas, categories, staffList } from "@/lib/mock-data";
 import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const [gasUrl, setGasUrlState] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     const stored = getStoredGasUrl();
@@ -46,6 +50,27 @@ export default function SettingsPage() {
 
   const isValidGasUrl =
     gasUrl.includes("script.google.com") && !gasUrl.includes("PASTE_GAS_URL_HERE");
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+      router.push("/login");
+      router.refresh();
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast({
+        title: "Error",
+        description: "Gagal logout. Silakan coba lagi.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -215,6 +240,28 @@ export default function SettingsPage() {
             <br />
             Data disimpan ke Google Sheets via Apps Script
           </p>
+        </Card>
+
+        {/* Logout Button */}
+        <Card className="p-4">
+          <Button
+            variant="destructive"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="w-full"
+          >
+            {isLoggingOut ? (
+              <span className="flex items-center gap-2">
+                <span className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
+                Keluar...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <LogOut className="w-4 h-4" />
+                Logout dari Sistem
+              </span>
+            )}
+          </Button>
         </Card>
       </div>
     </div>
