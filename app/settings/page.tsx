@@ -1,14 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { MobileHeader } from "@/components/mobile-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
-  Save,
   CheckCircle2,
   Info,
   Database,
@@ -17,7 +14,6 @@ import {
   Layers,
   LogOut,
 } from "lucide-react";
-import { setGasUrl, getStoredGasUrl } from "@/lib/api";
 import { outlets, areas, categories, staffList } from "@/lib/mock-data";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -25,31 +21,7 @@ import { useRouter } from "next/navigation";
 export default function SettingsPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const [gasUrl, setGasUrlState] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  useEffect(() => {
-    const stored = getStoredGasUrl();
-    setGasUrlState(stored);
-  }, []);
-
-  const handleSaveGasUrl = () => {
-    setIsSaving(true);
-
-    // Simulate save delay
-    setTimeout(() => {
-      setGasUrl(gasUrl);
-      setIsSaving(false);
-      toast({
-        title: "Pengaturan Disimpan",
-        description: "GAS Web App URL berhasil diperbarui",
-      });
-    }, 500);
-  };
-
-  const isValidGasUrl =
-    gasUrl.includes("script.google.com") && !gasUrl.includes("PASTE_GAS_URL_HERE");
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -77,7 +49,7 @@ export default function SettingsPage() {
       <MobileHeader title="Pengaturan" showBack backHref="/dashboard" />
 
       <div className="p-4 space-y-4 max-w-2xl mx-auto">
-        {/* GAS Configuration */}
+        {/* GAS Configuration Status */}
         <Card className="p-4 space-y-4">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -88,49 +60,24 @@ export default function SettingsPage() {
                 Google Apps Script
               </h3>
               <p className="text-sm text-muted-foreground">
-                Konfigurasi koneksi ke backend Google Sheets
+                Status koneksi ke backend Google Sheets
               </p>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label>GAS Web App URL</Label>
-            <Input
-              placeholder="https://script.google.com/macros/s/.../exec"
-              value={gasUrl}
-              onChange={(e) => setGasUrlState(e.target.value)}
-            />
-            {isValidGasUrl && (
-              <div className="flex items-center gap-1 text-emerald-600 text-sm">
-                <CheckCircle2 className="w-4 h-4" />
-                URL valid
-              </div>
-            )}
+          <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-lg">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <span className="text-sm text-emerald-800 font-medium">
+              Terhubung via Environment Variable
+            </span>
           </div>
-
-          <Button
-            onClick={handleSaveGasUrl}
-            disabled={isSaving}
-            className="w-full sm:w-auto"
-          >
-            {isSaving ? (
-              <span className="flex items-center gap-2">
-                <span className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-                Menyimpan...
-              </span>
-            ) : (
-              <span className="flex items-center gap-2">
-                <Save className="w-4 h-4" />
-                Simpan
-              </span>
-            )}
-          </Button>
 
           <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg text-sm">
             <Info className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
             <p className="text-blue-800">
-              Token Fonnte disimpan di Google Apps Script, bukan di frontend
-              ini. Pastikan Anda sudah mengkonfigurasi Apps Script dengan benar.
+              GAS URL dan API Key dikonfigurasi melalui environment variables
+              (GAS_WEB_APP_URL dan ADMIN_API_KEY). Token Fonnte disimpan di
+              Google Apps Script.
             </p>
           </div>
         </Card>
