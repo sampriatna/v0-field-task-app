@@ -25,6 +25,27 @@ import {
 // Internal API endpoint - no longer expose GAS URL directly
 const API_BASE = "/api/gas";
 
+// GAS can return the task list in several shapes. Normalize them all to an array.
+function normalizeTaskList(data: unknown): Task[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data as Task[];
+  if (typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.tasks)) return obj.tasks as Task[];
+    if (Array.isArray(obj.rows)) return obj.rows as Task[];
+    if (Array.isArray(obj.items)) return obj.items as Task[];
+    if (Array.isArray(obj.data)) return obj.data as Task[];
+  }
+  return [];
+}
+
+// Build the correct staff report link for the frontend route /report/[taskId]?token=
+export function buildReportLink(taskId: string, token: string, origin?: string): string {
+  const base =
+    origin || (typeof window !== "undefined" ? window.location.origin : "");
+  return `${base}/report/${taskId}?token=${token}`;
+}
+
 async function callApi<T>(
   action: string,
   payload?: Record<string, unknown>,
@@ -122,8 +143,10 @@ export async function getTaskByToken(
   token: string
 ): Promise<ApiResponse<Task>> {
   try {
+    // GAS does not expose a "getTaskByToken" action. The public "getTaskDetail"
+    // action validates the staff token and returns the full task, so we use it.
     const result = await callApi<Task>(
-      "getTaskByToken",
+      "getTaskDetail",
       { task_id: taskId, token },
       "GET"
     );
@@ -135,6 +158,14 @@ export async function getTaskByToken(
         return { success: true, data: task };
       }
       return { success: false, error: "Link tugas tidak valid" };
+    }
+
+    if (!result.success || !result.data) {
+      return {
+        success: false,
+        error:
+          "Link tugas tidak valid atau token salah. Hubungi leader.",
+      };
     }
 
     return result;
@@ -189,7 +220,7 @@ export async function submitTaskReport(
 
 export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[]>> {
   try {
-    const result = await callApi<Task[]>(
+    const result = await callApi<unknown>(
       "getTasks",
       filters as unknown as Record<string, unknown>,
       "GET"
@@ -214,7 +245,13 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
       return { success: true, data: tasks };
     }
 
-    return result;
+    if (result.success) {
+      const list = normalizeTaskList(result.data);
+      console.log("[v0] getTasks count:", list.length);
+      return { success: true, data: list };
+    }
+
+    return { success: false, error: result.error };
   } catch (error) {
     return {
       success: false,
@@ -225,18 +262,23 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
 
 export async function getTaskDetail(taskId: string): Promise<ApiResponse<Task>> {
   try {
-    const result = await callApi<Task>("getTaskDetail", { task_id: taskId }, "GET");
+    // GAS getTaskDetail requires the staff token, which the admin UI does not
+    // have from the URL alone. Instead, fetch the full task list (admin-scoped)
+    // and find the matching task — it already contains all fields we need.
+    const result = await getTasks();
 
-    if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(500);
-      const task = mockTasks.find((t) => t.task_id === taskId);
+    if (result.success && result.data) {
+      const task = result.data.find((t) => t.task_id === taskId);
       if (task) {
         return { success: true, data: task };
       }
       return { success: false, error: "Tugas tidak ditemukan" };
     }
 
-    return result;
+    return {
+      success: false,
+      error: result.error || "Gagal mengambil detail tugas",
+    };
   } catch (error) {
     return {
       success: false,
