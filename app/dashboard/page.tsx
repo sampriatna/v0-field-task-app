@@ -51,6 +51,7 @@ export default function DashboardPage() {
     revisi: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState<"tasks" | "checklists">("tasks");
 
@@ -194,6 +195,17 @@ export default function DashboardPage() {
 
   const hasActiveFilters = selectedOutlet !== "ALL" || selectedStatus !== "ALL" || searchQuery !== "";
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    console.log("[v0] Dashboard: Manual refresh triggered");
+    try {
+      await loadData();
+    } finally {
+      setIsRefreshing(false);
+      console.log("[v0] Dashboard: Manual refresh completed");
+    }
+  };
+
   const clearFilters = () => {
     setSelectedOutlet("ALL");
     setSelectedStatus("ALL");
@@ -291,6 +303,16 @@ export default function DashboardPage() {
                 className="shrink-0"
               >
                 <Filter className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleRefresh}
+                disabled={isRefreshing || isLoading}
+                className="shrink-0"
+                title="Refresh data"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
               </Button>
               <Link href="/tasks/new">
                 <Button size="icon" className="shrink-0">
