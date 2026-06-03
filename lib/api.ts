@@ -404,7 +404,10 @@ export async function verifyTask(
 ): Promise<ApiResponse<void>> {
   try {
     const action = status === "approved" ? "verifyTask" : "requestRevision";
-    const result = await callApi<void>(action, { task_id: taskId, note });
+    const result = await callApi<void>(action, { 
+      task_id: taskId, 
+      revision_note: note  // GAS expects revision_note field
+    });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(800);
@@ -758,7 +761,10 @@ export async function verifyChecklist(
 ): Promise<ApiResponse<void>> {
   try {
     const action = status === "approved" ? "approveChecklist" : "requestChecklistRevision";
-    const result = await callApi<void>(action, { task_id: taskId, note });
+    const result = await callApi<void>(action, { 
+      task_id: taskId, 
+      revision_note: note  // GAS expects revision_note field
+    });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(800);
