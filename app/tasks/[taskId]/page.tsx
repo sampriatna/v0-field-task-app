@@ -27,6 +27,7 @@ import {
   MessageSquare,
   AlertCircle,
   Trash2,
+  Bell,
 } from "lucide-react";
 import { getTaskDetail, verifyTask, resendWhatsApp } from "@/lib/api";
 import type { Task } from "@/lib/types";
@@ -196,6 +197,42 @@ export default function TaskDetailPage() {
         variant: "destructive",
       });
       setShowDeleteDialog(false);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleSendReminder = async () => {
+    setIsActionLoading(true);
+    try {
+      const response = await fetch("/api/gas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          action: "resendWhatsApp", 
+          task_id: taskId,
+          message_type: "reminder"
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Teguran Terkirim",
+          description: "Notifikasi reminder sudah dikirim kepada staff",
+        });
+      } else {
+        toast({
+          title: "Gagal mengirim teguran",
+          description: "Silakan coba lagi",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Gagal mengirim teguran",
+        description: "Terjadi kesalahan",
+        variant: "destructive",
+      });
     } finally {
       setIsActionLoading(false);
     }
@@ -471,6 +508,19 @@ export default function TaskDetailPage() {
                   >
                     <Send className="w-4 h-4 mr-2" />
                     Kirim Ulang WA
+                  </Button>
+                )}
+                
+                {/* Send Reminder Button for OPEN/LATE tasks */}
+                {task && (task.task_status === "OPEN" || task.task_status === "LATE" || task.task_status === "OPENED" || task.task_status === "CREATED" || task.task_status === "SENT") && (
+                  <Button
+                    variant="outline"
+                    onClick={handleSendReminder}
+                    disabled={isActionLoading}
+                    className="w-full sm:w-auto"
+                  >
+                    <Bell className="w-4 h-4 mr-2" />
+                    Kirim Teguran
                   </Button>
                 )}
               </div>
