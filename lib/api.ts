@@ -976,7 +976,7 @@ export async function activateStaff(staffId: string): Promise<ApiResponse<void>>
 
 export async function getAreas(): Promise<ApiResponse<string[]>> {
   try {
-    const result = await callApi<unknown>("getAreas", {});
+    const result = await callApi<unknown>("getAreas", {}, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(300);
@@ -1020,7 +1020,7 @@ export async function createArea(name: string): Promise<ApiResponse<string>> {
 
 export async function getCategories(): Promise<ApiResponse<string[]>> {
   try {
-    const result = await callApi<unknown>("getCategories", {});
+    const result = await callApi<unknown>("getCategories", {}, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(300);
