@@ -148,6 +148,46 @@ export default function SettingsPage() {
           </div>
         </Card>
 
+        {/* Master Area */}
+        <Link href="/settings/areas">
+          <Card className="p-4 space-y-4 hover:border-primary/50 transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Layers className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Master Area</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Kelola daftar area kerja (Dapur, Bar, Ruang Tamu, dll)
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </Card>
+        </Link>
+
+        {/* Master Kategori */}
+        <Link href="/settings/categories">
+          <Card className="p-4 space-y-4 hover:border-primary/50 transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Layers className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Master Kategori</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Kelola kategori tugas (Cleaning, Maintenance, Setup, dll)
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </Card>
+        </Link>
+
         {/* Staff List - Link to Staff Master */}
         <Link href="/settings/staff">
           <Card className="p-4 space-y-4 hover:border-primary/50 transition-colors cursor-pointer">
