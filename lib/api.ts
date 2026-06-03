@@ -978,18 +978,32 @@ export async function activateStaff(staffId: string): Promise<ApiResponse<void>>
 
 export async function getAreas(): Promise<ApiResponse<string[]>> {
   try {
-    const result = await callApi<unknown>("getAreas", {}, "GET");
+    const params = new URLSearchParams({ action: "getAreas" });
+    const response = await fetch(`${API_BASE}?${params.toString()}`, {
+      method: "GET",
+      credentials: "include",
+    });
 
-    if (!result.success || result.error) {
-      // GAS not configured or action not yet implemented - fallback to mock
+    if (response.status === 401) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return { success: true, data: mockAreas };
+    }
+
+    if (!response.ok) {
+      return { success: true, data: mockAreas };
+    }
+
+    const result = await response.json();
+
+    // GAS not configured or action not yet implemented — use fallback
+    if (!result || !result.success || result.error) {
       return { success: true, data: mockAreas };
     }
 
     if (result.data) {
-      const data = result.data as unknown;
-      if (Array.isArray(data)) return { success: true, data: data as string[] };
-      if (typeof data === "object" && data !== null) {
-        const obj = data as Record<string, unknown>;
+      if (Array.isArray(result.data)) return { success: true, data: result.data as string[] };
+      if (typeof result.data === "object") {
+        const obj = result.data as Record<string, unknown>;
         if (Array.isArray(obj.areas)) return { success: true, data: obj.areas as string[] };
         if (Array.isArray(obj.data)) return { success: true, data: obj.data as string[] };
       }
@@ -1022,18 +1036,32 @@ export async function createArea(name: string): Promise<ApiResponse<string>> {
 
 export async function getCategories(): Promise<ApiResponse<string[]>> {
   try {
-    const result = await callApi<unknown>("getCategories", {}, "GET");
+    const params = new URLSearchParams({ action: "getCategories" });
+    const response = await fetch(`${API_BASE}?${params.toString()}`, {
+      method: "GET",
+      credentials: "include",
+    });
 
-    if (!result.success || result.error) {
-      // GAS not configured or action not yet implemented - fallback to mock
+    if (response.status === 401) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return { success: true, data: mockCategories };
+    }
+
+    if (!response.ok) {
+      return { success: true, data: mockCategories };
+    }
+
+    const result = await response.json();
+
+    // GAS not configured or action not yet implemented — use fallback
+    if (!result || !result.success || result.error) {
       return { success: true, data: mockCategories };
     }
 
     if (result.data) {
-      const data = result.data as unknown;
-      if (Array.isArray(data)) return { success: true, data: data as string[] };
-      if (typeof data === "object" && data !== null) {
-        const obj = data as Record<string, unknown>;
+      if (Array.isArray(result.data)) return { success: true, data: result.data as string[] };
+      if (typeof result.data === "object") {
+        const obj = result.data as Record<string, unknown>;
         if (Array.isArray(obj.categories)) return { success: true, data: obj.categories as string[] };
         if (Array.isArray(obj.data)) return { success: true, data: obj.data as string[] };
       }
