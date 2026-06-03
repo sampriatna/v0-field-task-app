@@ -12,6 +12,9 @@ import type {
   SubmitChecklistPayload,
   ChecklistSummary,
   ChecklistItem,
+  Staff,
+  CreateStaffPayload,
+  UpdateStaffPayload,
 } from "./types";
 import { 
   mockTasks, 
@@ -25,18 +28,100 @@ import {
 // Internal API endpoint - no longer expose GAS URL directly
 const API_BASE = "/api/gas";
 
-// GAS can return the task list in several shapes. Normalize them all to an array.
+// Robust normalizer untuk berbagai format response dari GAS
 function normalizeTaskList(data: unknown): Task[] {
-  if (!data) return [];
-  if (Array.isArray(data)) return data as Task[];
+  if (!data) {
+    console.log("[v0] normalizeTaskList: data is null/undefined, returning empty");
+    return [];
+  }
+  
+  // Jika sudah array, return langsung
+  if (Array.isArray(data)) {
+    console.log("[v0] normalizeTaskList: direct array, count:", data.length);
+    return data as Task[];
+  }
+  
+  // Jika object, cari task di berbagai key
   if (typeof data === "object") {
     const obj = data as Record<string, unknown>;
-    if (Array.isArray(obj.tasks)) return obj.tasks as Task[];
-    if (Array.isArray(obj.rows)) return obj.rows as Task[];
-    if (Array.isArray(obj.items)) return obj.items as Task[];
-    if (Array.isArray(obj.data)) return obj.data as Task[];
+    
+    if (Array.isArray(obj.tasks)) {
+      console.log("[v0] normalizeTaskList: found in .tasks, count:", obj.tasks.length);
+      return obj.tasks as Task[];
+    }
+    if (Array.isArray(obj.data)) {
+      console.log("[v0] normalizeTaskList: found in .data, count:", obj.data.length);
+      return obj.data as Task[];
+    }
+    if (Array.isArray(obj.rows)) {
+      console.log("[v0] normalizeTaskList: found in .rows, count:", obj.rows.length);
+      return obj.rows as Task[];
+    }
+    if (Array.isArray(obj.items)) {
+      console.log("[v0] normalizeTaskList: found in .items, count:", obj.items.length);
+      return obj.items as Task[];
+    }
+    
+    console.log("[v0] normalizeTaskList: object has no array fields, keys:", Object.keys(obj));
   }
+  
+  console.log("[v0] normalizeTaskList: no array found, returning empty");
   return [];
+}
+
+// Normalize staff data from GAS (maps staff_name -> name, is_active -> status, etc.)
+function normalizeStaffFromGAS(gasStaff: Record<string, unknown>): Staff {
+  return {
+    staff_id: String(gasStaff.staff_id || ""),
+    name: String(gasStaff.staff_name || gasStaff.name || ""),
+    position: String(gasStaff.position || ""),
+    outlet: (gasStaff.outlet || "KBU") as Staff["outlet"],
+    area: (gasStaff.area || "Dapur") as Staff["area"],
+    wa_number: String(gasStaff.wa_number || ""),
+    role: (gasStaff.role || "STAFF") as Staff["role"],
+    status: gasStaff.is_active === "TRUE" || gasStaff.is_active === true || gasStaff.is_active === "ACTIVE" || gasStaff.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
+    created_at: String(gasStaff.created_at || ""),
+    updated_at: String(gasStaff.last_updated || gasStaff.updated_at || ""),
+  };
+}
+
+// Normalize staff list from GAS response
+function normalizeStaffList(data: unknown): Staff[] {
+  if (!data) return [];
+  
+  let rawList: Record<string, unknown>[] = [];
+  
+  if (Array.isArray(data)) {
+    rawList = data as Record<string, unknown>[];
+  } else if (typeof data === "object" && data !== null) {
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.staff)) rawList = obj.staff as Record<string, unknown>[];
+    else if (Array.isArray(obj.data)) rawList = obj.data as Record<string, unknown>[];
+    else if (Array.isArray(obj.rows)) rawList = obj.rows as Record<string, unknown>[];
+  }
+  
+  return rawList.map(normalizeStaffFromGAS);
+}
+
+// Convert frontend staff payload to GAS format
+function staffPayloadToGAS(payload: CreateStaffPayload | UpdateStaffPayload): Record<string, unknown> {
+  const gasPayload: Record<string, unknown> = {
+    staff_name: payload.name,
+    wa_number: payload.wa_number,
+    outlet: payload.outlet,
+    role: payload.role,
+    // Optional fields - only include if they exist
+  };
+  
+  if ("staff_id" in payload) {
+    gasPayload.staff_id = payload.staff_id;
+  }
+  
+  // Include position and area if GAS supports them
+  if (payload.position) gasPayload.position = payload.position;
+  if (payload.area) gasPayload.area = payload.area;
+  
+  return gasPayload;
 }
 
 // Build the correct staff report link for the frontend route /report/[taskId]?token=
@@ -220,6 +305,8 @@ export async function submitTaskReport(
 
 export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[]>> {
   try {
+    console.log("[v0] getTasks: loading with filters:", filters ? Object.keys(filters) : "none");
+    
     const result = await callApi<unknown>(
       "getTasks",
       filters as unknown as Record<string, unknown>,
@@ -227,6 +314,7 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
     );
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      console.log("[v0] getTasks: GAS not configured, using mock data");
       await delay(500);
       let tasks = [...mockTasks];
 
@@ -242,20 +330,24 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
         );
       }
 
+      console.log("[v0] getTasks: mock data count:", tasks.length);
       return { success: true, data: tasks };
     }
 
-    if (result.success) {
+    if (result.success && result.data !== undefined) {
       const list = normalizeTaskList(result.data);
-      console.log("[v0] getTasks count:", list.length);
+      console.log("[v0] getTasks: success, normalized count:", list.length);
       return { success: true, data: list };
     }
 
+    console.log("[v0] getTasks: error:", result.error);
     return { success: false, error: result.error };
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Unknown error";
+    console.log("[v0] getTasks: exception:", errorMsg);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Gagal mengambil daftar tugas",
+      error: errorMsg || "Gagal mengambil daftar tugas",
     };
   }
 }
@@ -696,6 +788,178 @@ export async function resendChecklistWhatsApp(taskId: string): Promise<ApiRespon
     return {
       success: false,
       error: error instanceof Error ? error.message : "Gagal mengirim ulang WhatsApp checklist",
+    };
+  }
+}
+
+// =============================================
+// STAFF MASTER API FUNCTIONS
+// =============================================
+
+// Mock staff data for fallback
+const mockStaff: Staff[] = [
+  {
+    staff_id: "STF-001",
+    name: "Budi Santoso",
+    position: "Cook",
+    outlet: "KBU",
+    area: "Dapur",
+    wa_number: "6281234567890",
+    role: "STAFF",
+    status: "ACTIVE",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    staff_id: "STF-002",
+    name: "Ani Wijaya",
+    position: "Barista",
+    outlet: "Kisamen",
+    area: "Bar",
+    wa_number: "6281234567891",
+    role: "STAFF",
+    status: "ACTIVE",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+export async function getStaff(filters?: { outlet?: string; status?: string }): Promise<ApiResponse<Staff[]>> {
+  try {
+    const result = await callApi<unknown>("getStaff", filters as Record<string, string>, "GET");
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      let staff = [...mockStaff];
+      if (filters?.outlet) {
+        staff = staff.filter(s => s.outlet === filters.outlet);
+      }
+      if (filters?.status) {
+        staff = staff.filter(s => s.status === filters.status);
+      }
+      return { success: true, data: staff };
+    }
+
+    // Normalize response using the staff normalizer
+    if (result.success && result.data) {
+      const normalized = normalizeStaffList(result.data);
+      
+      // Apply filters if needed (in case GAS doesn't filter)
+      let filtered = normalized;
+      if (filters?.outlet) {
+        filtered = filtered.filter(s => s.outlet === filters.outlet);
+      }
+      if (filters?.status) {
+        filtered = filtered.filter(s => s.status === filters.status);
+      }
+      
+      return { success: true, data: filtered };
+    }
+
+    return { success: true, data: [] };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengambil daftar staff",
+    };
+  }
+}
+
+export async function createStaff(payload: CreateStaffPayload): Promise<ApiResponse<Staff>> {
+  try {
+    // Convert frontend field names to GAS field names
+    const gasPayload = staffPayloadToGAS(payload);
+    const result = await callApi<Record<string, unknown>>("createStaff", gasPayload);
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(1000);
+      const newStaff: Staff = {
+        staff_id: `STF-${String(Date.now()).slice(-6)}`,
+        ...payload,
+        status: "ACTIVE",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      return { success: true, data: newStaff };
+    }
+
+    // Normalize response from GAS
+    if (result.success && result.data) {
+      return { success: true, data: normalizeStaffFromGAS(result.data) };
+    }
+
+    return { success: false, error: result.error || "Gagal menambah staff" };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menambah staff",
+    };
+  }
+}
+
+export async function updateStaff(payload: UpdateStaffPayload): Promise<ApiResponse<Staff>> {
+  try {
+    // Convert frontend field names to GAS field names
+    const gasPayload = staffPayloadToGAS(payload);
+    const result = await callApi<Record<string, unknown>>("updateStaff", gasPayload);
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(1000);
+      const updatedStaff: Staff = {
+        ...payload,
+        status: "ACTIVE",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      return { success: true, data: updatedStaff };
+    }
+
+    // Normalize response from GAS
+    if (result.success && result.data) {
+      return { success: true, data: normalizeStaffFromGAS(result.data) };
+    }
+
+    return { success: false, error: result.error || "Gagal mengupdate staff" };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengupdate staff",
+    };
+  }
+}
+
+export async function deactivateStaff(staffId: string): Promise<ApiResponse<void>> {
+  try {
+    const result = await callApi<void>("deactivateStaff", { staff_id: staffId });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      return { success: true };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menonaktifkan staff",
+    };
+  }
+}
+
+export async function activateStaff(staffId: string): Promise<ApiResponse<void>> {
+  try {
+    const result = await callApi<void>("activateStaff", { staff_id: staffId });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      return { success: true };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal mengaktifkan staff",
     };
   }
 }

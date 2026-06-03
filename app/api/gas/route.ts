@@ -37,6 +37,8 @@ const ADMIN_ACTIONS = [
   "createStaff",
   "updateStaff",
   "deleteStaff",
+  "deactivateStaff",
+  "activateStaff",
   "getStaff",
   "getChecklistTemplate",
   "saveChecklistTemplate",
@@ -200,11 +202,14 @@ async function forwardToGas(
         );
       }
       
+      // Return detailed debug info for non-JSON responses
       return NextResponse.json(
         { 
           success: false, 
-          error: "Response dari GAS bukan JSON valid",
-          raw: responseText.substring(0, 200),
+          message: "Response dari GAS bukan JSON valid",
+          status: response.status,
+          contentType: response.headers.get("content-type"),
+          rawPreview: responseText.slice(0, 500),
         },
         { status: 500 }
       );

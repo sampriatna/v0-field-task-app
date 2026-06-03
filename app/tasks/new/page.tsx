@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { MobileHeader } from "@/components/mobile-header";
 import { PhotoUploader } from "@/components/photo-uploader";
@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -16,10 +17,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle2, Send, Copy, AlertTriangle, ExternalLink } from "lucide-react";
-import { createTask, buildReportLink } from "@/lib/api";
-import { outlets, areas, categories, priorities, staffList } from "@/lib/mock-data";
-import type { CreateTaskPayload, Outlet, Area, Category, TaskPriority, Task } from "@/lib/types";
+import { CheckCircle2, Send, Copy, AlertTriangle, ExternalLink, User } from "lucide-react";
+import { createTask, buildReportLink, getStaff } from "@/lib/api";
+import { outlets, areas, categories, priorities } from "@/lib/mock-data";
+import type { CreateTaskPayload, Outlet, Area, Category, TaskPriority, Task, Staff } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 export default function CreateTaskPage() {
@@ -28,6 +29,11 @@ export default function CreateTaskPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdTask, setCreatedTask] = useState<Task | null>(null);
+  
+  // Staff data from API
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(true);
+  const [manualMode, setManualMode] = useState(false);
 
   // Form state
   const [outlet, setOutlet] = useState<Outlet | "">("");
@@ -38,19 +44,43 @@ export default function CreateTaskPage() {
   const [priority, setPriority] = useState<TaskPriority>("Medium");
   const [picName, setPicName] = useState("");
   const [picWa, setPicWa] = useState("");
+  const [selectedStaffId, setSelectedStaffId] = useState<string>("");
   const [deadline, setDeadline] = useState("");
   const [beforePhoto, setBeforePhoto] = useState<string | undefined>();
 
+  // Load staff data on mount
+  useEffect(() => {
+    loadStaff();
+  }, []);
+
+  const loadStaff = async () => {
+    setIsLoadingStaff(true);
+    try {
+      const result = await getStaff({ status: "ACTIVE" });
+      if (result.success && result.data) {
+        setStaffList(result.data);
+      }
+    } catch (error) {
+      console.error("Failed to load staff:", error);
+    } finally {
+      setIsLoadingStaff(false);
+    }
+  };
+
   // Get filtered staff based on selected outlet
   const filteredStaff = outlet
-    ? staffList.filter((s) => s.outlet === outlet)
-    : staffList;
+    ? staffList.filter((s) => s.outlet === outlet && s.status === "ACTIVE")
+    : staffList.filter((s) => s.status === "ACTIVE");
 
-  const handleStaffSelect = (name: string) => {
-    const staff = staffList.find((s) => s.name === name);
+  const handleStaffSelect = (staffId: string) => {
+    const staff = staffList.find((s) => s.staff_id === staffId);
     if (staff) {
+      setSelectedStaffId(staffId);
       setPicName(staff.name);
-      setPicWa(staff.wa);
+      setPicWa(staff.wa_number);
+      // Auto-fill outlet and area if not already set
+      if (!outlet) setOutlet(staff.outlet);
+      if (!area) setArea(staff.area);
     }
   };
 
@@ -202,8 +232,10 @@ export default function CreateTaskPage() {
                   setPriority("Medium");
                   setPicName("");
                   setPicWa("");
+                  setSelectedStaffId("");
                   setDeadline("");
                   setBeforePhoto(undefined);
+                  setManualMode(false);
                 }}
                 className="flex-1"
               >
@@ -237,8 +269,12 @@ export default function CreateTaskPage() {
                 value={outlet}
                 onValueChange={(v) => {
                   setOutlet(v as Outlet);
-                  setPicName("");
-                  setPicWa("");
+                  // Reset staff selection when outlet changes
+                  if (!manualMode) {
+                    setPicName("");
+                    setPicWa("");
+                    setSelectedStaffId("");
+                  }
                 }}
               >
                 <SelectTrigger>
@@ -354,49 +390,113 @@ export default function CreateTaskPage() {
 
         {/* PIC Section */}
         <Card className="p-4 space-y-4">
-          <h3 className="font-semibold text-foreground">Penanggung Jawab</h3>
-
-          {filteredStaff.length > 0 && (
-            <div className="space-y-2">
-              <Label>Pilih dari Daftar Staff</Label>
-              <Select value={picName} onValueChange={handleStaffSelect}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih staff" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredStaff.map((s) => (
-                    <SelectItem key={s.name} value={s.name}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>
-                Nama PIC <span className="text-red-500">*</span>
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-foreground">Penanggung Jawab</h3>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="manual-mode" className="text-sm text-muted-foreground">
+                Input Manual
               </Label>
-              <Input
-                placeholder="Nama penanggung jawab"
-                value={picName}
-                onChange={(e) => setPicName(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>
-                No. WhatsApp <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                placeholder="628xxx"
-                value={picWa}
-                onChange={(e) => setPicWa(e.target.value)}
+              <Switch
+                id="manual-mode"
+                checked={manualMode}
+                onCheckedChange={(checked) => {
+                  setManualMode(checked);
+                  if (!checked) {
+                    // Reset to staff selection mode
+                    setPicName("");
+                    setPicWa("");
+                    setSelectedStaffId("");
+                  }
+                }}
               />
             </div>
           </div>
+
+          {!manualMode ? (
+            <>
+              {isLoadingStaff ? (
+                <div className="p-4 bg-muted/50 rounded-lg text-center">
+                  <p className="text-sm text-muted-foreground">Memuat daftar staff...</p>
+                </div>
+              ) : filteredStaff.length > 0 ? (
+                <div className="space-y-2">
+                  <Label>Pilih Staff <span className="text-red-500">*</span></Label>
+                  <Select value={selectedStaffId} onValueChange={handleStaffSelect}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih staff" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredStaff.map((s) => (
+                        <SelectItem key={s.staff_id} value={s.staff_id}>
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <span>{s.name}</span>
+                            <span className="text-muted-foreground">- {s.position}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedStaffId && (
+                    <div className="p-3 bg-muted/50 rounded-lg text-sm">
+                      <p className="text-muted-foreground">
+                        <strong>Nama:</strong> {picName}
+                      </p>
+                      <p className="text-muted-foreground">
+                        <strong>WhatsApp:</strong> {picWa}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800">
+                    {outlet ? `Tidak ada staff aktif di outlet ${outlet}.` : "Pilih outlet terlebih dahulu atau aktifkan mode manual."}
+                  </p>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="p-0 h-auto text-amber-800 underline"
+                    onClick={() => setManualMode(true)}
+                  >
+                    Input manual
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-800">
+                  Mode manual: Anda bisa memasukkan nama dan nomor WhatsApp secara langsung.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>
+                    Nama PIC <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    placeholder="Nama penanggung jawab"
+                    value={picName}
+                    onChange={(e) => setPicName(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>
+                    No. WhatsApp <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    placeholder="628xxx"
+                    value={picWa}
+                    onChange={(e) => setPicWa(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>

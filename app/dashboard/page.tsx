@@ -15,9 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight } from "lucide-react";
+import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import { getTasks, getDashboardSummary, getChecklistReports, getChecklistSummary } from "@/lib/api";
+import { getTasks, getChecklistReports } from "@/lib/api";
 import type { Task, DashboardSummary, TaskStatus, Outlet, ChecklistReport, ChecklistSummary } from "@/lib/types";
 import { outlets } from "@/lib/mock-data";
 import { StatusBadge } from "@/components/status-badge";
@@ -63,36 +63,108 @@ export default function DashboardPage() {
     loadData();
   }, []);
 
+  // Calculate summary from tasks array to ensure consistency
+  const calculateTaskSummary = (taskList: Task[]): DashboardSummary => {
+    const manualTasks = taskList.filter(t => t.checklist_mode !== "YES");
+    
+    // Status groupings per requirements
+    const openStatuses = ["CREATED", "SENT", "WA_FAILED", "OPEN", "OPENED"];
+    const submittedStatuses = ["SUBMITTED", "RESUBMITTED", "WAITING_VERIFICATION"];
+    const doneStatuses = ["DONE", "VERIFIED"];
+    const revisiStatuses = ["REVISI", "REVISION", "REVISION_REQUESTED"];
+    
+    return {
+      total: manualTasks.length,
+      open: manualTasks.filter(t => openStatuses.includes(t.status)).length,
+      submitted: manualTasks.filter(t => submittedStatuses.includes(t.status)).length,
+      done: manualTasks.filter(t => doneStatuses.includes(t.status)).length,
+      late: manualTasks.filter(t => t.status === "LATE" || t.is_late === true || t.is_late === "YES").length,
+      revisi: manualTasks.filter(t => revisiStatuses.includes(t.status)).length,
+    };
+  };
+
+  // Calculate checklist summary from tasks with checklist_mode === "YES"
+  const calculateChecklistSummary = (taskList: Task[]): ChecklistSummary => {
+    const checklistTasks = taskList.filter(t => t.checklist_mode === "YES");
+    
+    const openStatuses = ["CREATED", "SENT", "WA_FAILED", "OPEN", "OPENED"];
+    const submittedStatuses = ["SUBMITTED", "RESUBMITTED", "WAITING_VERIFICATION"];
+    const doneStatuses = ["DONE", "VERIFIED"];
+    const revisiStatuses = ["REVISI", "REVISION", "REVISION_REQUESTED"];
+    
+    return {
+      total: checklistTasks.length,
+      open: checklistTasks.filter(t => openStatuses.includes(t.status)).length,
+      submitted: checklistTasks.filter(t => submittedStatuses.includes(t.status)).length,
+      done: checklistTasks.filter(t => doneStatuses.includes(t.status)).length,
+      late: checklistTasks.filter(t => t.status === "LATE" || t.is_late === true || t.is_late === "YES").length,
+      revisi: checklistTasks.filter(t => revisiStatuses.includes(t.status)).length,
+    };
+  };
+
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Timeout wrapper for API calls
+  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout")), ms)
+      ),
+    ]);
+  };
+
   const loadData = async () => {
     setIsLoading(true);
+    setLoadError(null);
+    console.log("[v0] Dashboard: Starting to load data...");
+    
     try {
-      const [tasksResult, summaryResult, checklistsResult, checklistSummaryResult] = await Promise.all([
-        getTasks(),
-        getDashboardSummary(),
-        getChecklistReports(),
-        getChecklistSummary(),
-      ]);
-
+      // Load tasks with 15 second timeout
+      console.log("[v0] Dashboard: Calling getTasks()...");
+      const tasksResult = await withTimeout(getTasks(), 15000);
+      console.log("[v0] Dashboard: getTasks() returned:", tasksResult.success ? "success" : "error", tasksResult.error || "");
+      
       if (tasksResult.success && tasksResult.data) {
+        console.log("[v0] Dashboard: Tasks loaded, count:", tasksResult.data.length);
         setTasks(tasksResult.data);
+        setSummary(calculateTaskSummary(tasksResult.data));
+        setChecklistSummary(calculateChecklistSummary(tasksResult.data));
+      } else {
+        // If tasks fail, still show empty dashboard
+        console.log("[v0] Dashboard: Tasks failed, showing error");
+        setTasks([]);
+        setLoadError(tasksResult.error || "Gagal memuat tugas");
       }
-      if (summaryResult.success && summaryResult.data) {
-        setSummary(summaryResult.data);
-      }
-      if (checklistsResult.success && checklistsResult.data) {
-        setChecklists(checklistsResult.data);
-      }
-      if (checklistSummaryResult.success && checklistSummaryResult.data) {
-        setChecklistSummary(checklistSummaryResult.data);
+      
+      // Load checklists separately (non-blocking)
+      try {
+        console.log("[v0] Dashboard: Calling getChecklistReports()...");
+        const checklistsResult = await withTimeout(getChecklistReports(), 10000);
+        if (checklistsResult.success && checklistsResult.data) {
+          console.log("[v0] Dashboard: Checklists loaded, count:", checklistsResult.data.length);
+          setChecklists(checklistsResult.data);
+        }
+      } catch (error) {
+        // Checklist error is non-fatal
+        console.log("[v0] Dashboard: Checklists failed (non-blocking):", error);
       }
     } catch (error) {
-      console.error("Failed to load data:", error);
+      console.error("[v0] Dashboard: Failed to load dashboard:", error);
+      setLoadError(error instanceof Error ? error.message : "Gagal memuat data");
+      // Still show empty dashboard instead of crashing
+      setTasks([]);
     } finally {
       setIsLoading(false);
+      console.log("[v0] Dashboard: Finished loading");
     }
   };
 
-  const filteredTasks = tasks.filter((task) => {
+  // Filter tasks: manual tasks (non-checklist) and checklist tasks
+  const manualTasks = tasks.filter(t => t.checklist_mode !== "YES");
+  const checklistTasks = tasks.filter(t => t.checklist_mode === "YES");
+
+  const filteredTasks = manualTasks.filter((task) => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const matchesSearch =
@@ -133,6 +205,25 @@ export default function DashboardPage() {
       <MobileHeader title="Dashboard" showSettings />
 
       <div className="p-4 space-y-4 max-w-5xl mx-auto">
+        {/* Error Alert */}
+        {loadError && tasks.length > 0 && (
+          <Card className="bg-red-50 border-red-200">
+            <CardContent className="p-4 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm text-red-800">{loadError}</p>
+                <Button 
+                  variant="link" 
+                  size="sm"
+                  onClick={() => loadData()}
+                  className="text-red-600 p-0 h-auto"
+                >
+                  Coba muat ulang
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-3">
           <Link href="/recurring">
@@ -170,11 +261,11 @@ export default function DashboardPage() {
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="tasks" className="flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
-              Tugas ({summary.total})
+              Tugas ({manualTasks.length})
             </TabsTrigger>
             <TabsTrigger value="checklists" className="flex items-center gap-2">
               <ListChecks className="w-4 h-4" />
-              Checklist ({checklistSummary.total})
+              Checklist ({checklistTasks.length})
             </TabsTrigger>
           </TabsList>
 
