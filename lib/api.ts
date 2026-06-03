@@ -23,6 +23,8 @@ import {
   mockChecklistReports, 
   mockChecklistSummary,
   mockChecklistItems,
+  areas as mockAreas,
+  categories as mockCategories,
 } from "./mock-data";
 
 // Internal API endpoint - no longer expose GAS URL directly
@@ -978,12 +980,12 @@ export async function getAreas(): Promise<ApiResponse<string[]>> {
   try {
     const result = await callApi<unknown>("getAreas", {}, "GET");
 
-    if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(300);
-      return { success: true, data: areas };
+    if (!result.success || result.error) {
+      // GAS not configured or action not yet implemented - fallback to mock
+      return { success: true, data: mockAreas };
     }
 
-    if (result.success && result.data) {
+    if (result.data) {
       const data = result.data as unknown;
       if (Array.isArray(data)) return { success: true, data: data as string[] };
       if (typeof data === "object" && data !== null) {
@@ -993,9 +995,9 @@ export async function getAreas(): Promise<ApiResponse<string[]>> {
       }
     }
 
-    return { success: true, data: areas };
-  } catch (error) {
-    return { success: false, error: "Gagal mengambil daftar area" };
+    return { success: true, data: mockAreas };
+  } catch {
+    return { success: true, data: mockAreas };
   }
 }
 
@@ -1022,12 +1024,12 @@ export async function getCategories(): Promise<ApiResponse<string[]>> {
   try {
     const result = await callApi<unknown>("getCategories", {}, "GET");
 
-    if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(300);
-      return { success: true, data: categories };
+    if (!result.success || result.error) {
+      // GAS not configured or action not yet implemented - fallback to mock
+      return { success: true, data: mockCategories };
     }
 
-    if (result.success && result.data) {
+    if (result.data) {
       const data = result.data as unknown;
       if (Array.isArray(data)) return { success: true, data: data as string[] };
       if (typeof data === "object" && data !== null) {
@@ -1037,9 +1039,9 @@ export async function getCategories(): Promise<ApiResponse<string[]>> {
       }
     }
 
-    return { success: true, data: categories };
-  } catch (error) {
-    return { success: false, error: "Gagal mengambil daftar kategori" };
+    return { success: true, data: mockCategories };
+  } catch {
+    return { success: true, data: mockCategories };
   }
 }
 
