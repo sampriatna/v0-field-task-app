@@ -15,12 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight, AlertTriangle } from "lucide-react";
+import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight, AlertTriangle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { getTasks, getChecklistReports } from "@/lib/api";
 import type { Task, DashboardSummary, TaskStatus, Outlet, ChecklistReport, ChecklistSummary } from "@/lib/types";
 import { outlets } from "@/lib/mock-data";
 import { StatusBadge } from "@/components/status-badge";
+import { useToast } from "@/hooks/use-toast";
 
 const statusOptions: { value: TaskStatus | "ALL"; label: string }[] = [
   { value: "ALL", label: "Semua Status" },
@@ -32,6 +33,7 @@ const statusOptions: { value: TaskStatus | "ALL"; label: string }[] = [
 ];
 
 export default function DashboardPage() {
+  const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [checklists, setChecklists] = useState<ChecklistReport[]>([]);
   const [summary, setSummary] = useState<DashboardSummary>({
@@ -210,6 +212,18 @@ export default function DashboardPage() {
     setSelectedOutlet("ALL");
     setSelectedStatus("ALL");
     setSearchQuery("");
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    // Remove task from local state immediately for instant feedback
+    const updated = tasks.filter((t) => t.task_id !== taskId);
+    setTasks(updated);
+    setSummary(calculateTaskSummary(updated));
+    setChecklistSummary(calculateChecklistSummary(updated));
+    toast({
+      title: "Tugas berhasil dihapus",
+      description: `Tugas ${taskId} telah dihapus dari sistem.`,
+    });
   };
 
   return (
@@ -404,7 +418,7 @@ export default function DashboardPage() {
               ) : (
                 <div className="space-y-3">
                   {filteredTasks.map((task) => (
-                    <TaskCard key={task.task_id} task={task} />
+                    <TaskCard key={task.task_id} task={task} onDelete={handleDeleteTask} />
                   ))}
                 </div>
               )}
