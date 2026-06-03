@@ -256,6 +256,8 @@ export interface Staff {
   wa_number: string;
   role: StaffRole;
   status: StaffStatus;
+  login_pin?: string;           // 4-6 digit PIN untuk leader login
+  login_enabled?: boolean;       // Toggle akses login untuk staff
   created_at: string;
   updated_at: string;
 }
@@ -271,4 +273,16 @@ export interface CreateStaffPayload {
 
 export interface UpdateStaffPayload extends CreateStaffPayload {
   staff_id: string;
+  login_pin?: string;
+  login_enabled?: boolean;
+}
+
+// Leader/Multi-user login session
+export interface LeaderSession {
+  staff_id: string;
+  name: string;
+  wa_number: string;
+  outlet: Outlet;
+  role: StaffRole;
+  login_time: number; // timestamp
 }

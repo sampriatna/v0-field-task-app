@@ -26,6 +26,8 @@ import {
   Image as ImageIcon,
   MessageSquare,
   AlertCircle,
+  Trash2,
+  Bell,
 } from "lucide-react";
 import { getTaskDetail, verifyTask, resendWhatsApp } from "@/lib/api";
 import type { Task } from "@/lib/types";
@@ -49,6 +51,7 @@ export default function TaskDetailPage() {
 
   const [showRevisionDialog, setShowRevisionDialog] = useState(false);
   const [revisionNote, setRevisionNote] = useState("");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     loadTask();
@@ -154,6 +157,79 @@ export default function TaskDetailPage() {
     } catch (error) {
       toast({
         title: "Gagal mengirim ulang",
+        description: "Terjadi kesalahan",
+        variant: "destructive",
+      });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsActionLoading(true);
+    try {
+      const response = await fetch("/api/gas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "deleteTask", task_id: taskId }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Tugas Dihapus",
+          description: "Tugas telah dihapus dari sistem",
+        });
+        setTimeout(() => {
+          window.location.href = "/dashboard";
+        }, 1000);
+      } else {
+        toast({
+          title: "Gagal menghapus",
+          description: "Silakan coba lagi",
+          variant: "destructive",
+        });
+        setShowDeleteDialog(false);
+      }
+    } catch (error) {
+      toast({
+        title: "Gagal menghapus",
+        description: "Terjadi kesalahan",
+        variant: "destructive",
+      });
+      setShowDeleteDialog(false);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleSendReminder = async () => {
+    setIsActionLoading(true);
+    try {
+      const response = await fetch("/api/gas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          action: "resendWhatsApp", 
+          task_id: taskId,
+          message_type: "reminder"
+        }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Teguran Terkirim",
+          description: "Notifikasi reminder sudah dikirim kepada staff",
+        });
+      } else {
+        toast({
+          title: "Gagal mengirim teguran",
+          description: "Silakan coba lagi",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Gagal mengirim teguran",
         description: "Terjadi kesalahan",
         variant: "destructive",
       });
@@ -400,39 +476,65 @@ export default function TaskDetailPage() {
         {(canApprove || canResendWA) && (
           <Card className="p-4">
             <h3 className="font-semibold text-foreground mb-3">Aksi</h3>
-            <div className="flex flex-wrap gap-2">
-              {canApprove && (
-                <>
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                {canApprove && (
+                  <>
+                    <Button
+                      onClick={handleApprove}
+                      disabled={isActionLoading}
+                      className="flex-1"
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Setujui
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowRevisionDialog(true)}
+                      disabled={isActionLoading}
+                      className="flex-1"
+                    >
+                      <RotateCcw className="w-4 h-4 mr-2" />
+                      Minta Revisi
+                    </Button>
+                  </>
+                )}
+                {canResendWA && (
                   <Button
-                    onClick={handleApprove}
+                    variant="secondary"
+                    onClick={handleResendWA}
                     disabled={isActionLoading}
-                    className="flex-1"
+                    className="w-full sm:w-auto"
                   >
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
-                    Setujui
+                    <Send className="w-4 h-4 mr-2" />
+                    Kirim Ulang WA
                   </Button>
+                )}
+                
+                {/* Send Reminder Button for OPEN/LATE tasks */}
+                {task && (task.task_status === "OPEN" || task.task_status === "LATE" || task.task_status === "OPENED" || task.task_status === "CREATED" || task.task_status === "SENT") && (
                   <Button
                     variant="outline"
-                    onClick={() => setShowRevisionDialog(true)}
+                    onClick={handleSendReminder}
                     disabled={isActionLoading}
-                    className="flex-1"
+                    className="w-full sm:w-auto"
                   >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    Minta Revisi
+                    <Bell className="w-4 h-4 mr-2" />
+                    Kirim Teguran
                   </Button>
-                </>
-              )}
-              {canResendWA && (
-                <Button
-                  variant="secondary"
-                  onClick={handleResendWA}
-                  disabled={isActionLoading}
-                  className="w-full sm:w-auto"
-                >
-                  <Send className="w-4 h-4 mr-2" />
-                  Kirim Ulang WA
-                </Button>
-              )}
+                )}
+              </div>
+              
+              {/* Delete Button */}
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteDialog(true)}
+                disabled={isActionLoading}
+                className="w-full"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Hapus Tugas
+              </Button>
             </div>
           </Card>
         )}
@@ -462,6 +564,42 @@ export default function TaskDetailPage() {
             </Button>
             <Button onClick={handleRevision} disabled={isActionLoading}>
               {isActionLoading ? "Mengirim..." : "Kirim Revisi"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Hapus Tugas</DialogTitle>
+            <DialogDescription>
+              Apakah Anda yakin ingin menghapus tugas ini? Tindakan ini tidak dapat dibatalkan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-4 bg-destructive/10 rounded-lg">
+            <p className="text-sm text-destructive font-medium">
+              Tugas: {task?.task_title}
+            </p>
+            <p className="text-xs text-destructive/80 mt-1">
+              {task?.task_id}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={isActionLoading}
+            >
+              Batal
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDelete} 
+              disabled={isActionLoading}
+            >
+              {isActionLoading ? "Menghapus..." : "Hapus Tugas"}
             </Button>
           </DialogFooter>
         </DialogContent>

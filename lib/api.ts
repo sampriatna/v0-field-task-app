@@ -404,7 +404,10 @@ export async function verifyTask(
 ): Promise<ApiResponse<void>> {
   try {
     const action = status === "approved" ? "verifyTask" : "requestRevision";
-    const result = await callApi<void>(action, { task_id: taskId, note });
+    const result = await callApi<void>(action, { 
+      task_id: taskId, 
+      revision_note: note  // GAS expects revision_note field
+    });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(800);
@@ -758,7 +761,10 @@ export async function verifyChecklist(
 ): Promise<ApiResponse<void>> {
   try {
     const action = status === "approved" ? "approveChecklist" : "requestChecklistRevision";
-    const result = await callApi<void>(action, { task_id: taskId, note });
+    const result = await callApi<void>(action, { 
+      task_id: taskId, 
+      revision_note: note  // GAS expects revision_note field
+    });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(800);
@@ -961,5 +967,97 @@ export async function activateStaff(staffId: string): Promise<ApiResponse<void>>
       success: false,
       error: error instanceof Error ? error.message : "Gagal mengaktifkan staff",
     };
+  }
+}
+
+// =============================================
+// AREA & CATEGORY MANAGEMENT
+// =============================================
+
+export async function getAreas(): Promise<ApiResponse<string[]>> {
+  try {
+    const result = await callApi<unknown>("getAreas", {});
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(300);
+      return { success: true, data: areas };
+    }
+
+    if (result.success && result.data) {
+      const data = result.data as unknown;
+      if (Array.isArray(data)) return { success: true, data: data as string[] };
+      if (typeof data === "object" && data !== null) {
+        const obj = data as Record<string, unknown>;
+        if (Array.isArray(obj.areas)) return { success: true, data: obj.areas as string[] };
+        if (Array.isArray(obj.data)) return { success: true, data: obj.data as string[] };
+      }
+    }
+
+    return { success: true, data: areas };
+  } catch (error) {
+    return { success: false, error: "Gagal mengambil daftar area" };
+  }
+}
+
+export async function createArea(name: string): Promise<ApiResponse<string>> {
+  try {
+    const result = await callApi<{ area?: string; data?: string }>("createArea", { name });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      return { success: true, data: name };
+    }
+
+    if (result.success && result.data) {
+      return { success: true, data: (result.data.area || result.data.data || name) as string };
+    }
+
+    return { success: false, error: result.error || "Gagal menambah area" };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Gagal menambah area" };
+  }
+}
+
+export async function getCategories(): Promise<ApiResponse<string[]>> {
+  try {
+    const result = await callApi<unknown>("getCategories", {});
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(300);
+      return { success: true, data: categories };
+    }
+
+    if (result.success && result.data) {
+      const data = result.data as unknown;
+      if (Array.isArray(data)) return { success: true, data: data as string[] };
+      if (typeof data === "object" && data !== null) {
+        const obj = data as Record<string, unknown>;
+        if (Array.isArray(obj.categories)) return { success: true, data: obj.categories as string[] };
+        if (Array.isArray(obj.data)) return { success: true, data: obj.data as string[] };
+      }
+    }
+
+    return { success: true, data: categories };
+  } catch (error) {
+    return { success: false, error: "Gagal mengambil daftar kategori" };
+  }
+}
+
+export async function createCategory(name: string): Promise<ApiResponse<string>> {
+  try {
+    const result = await callApi<{ category?: string; data?: string }>("createCategory", { name });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      return { success: true, data: name };
+    }
+
+    if (result.success && result.data) {
+      return { success: true, data: (result.data.category || result.data.data || name) as string };
+    }
+
+    return { success: false, error: result.error || "Gagal menambah kategori" };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Gagal menambah kategori" };
   }
 }
