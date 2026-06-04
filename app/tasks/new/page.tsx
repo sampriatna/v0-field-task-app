@@ -18,8 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CheckCircle2, Send, Copy, AlertTriangle, ExternalLink, User } from "lucide-react";
-import { createTask, buildReportLink, getStaff } from "@/lib/api";
-import { outlets, areas, categories, priorities } from "@/lib/mock-data";
+import { createTask, buildReportLink, getStaff, getAreas, getCategories } from "@/lib/api";
+import { outlets, priorities } from "@/lib/mock-data";
 import type { CreateTaskPayload, Outlet, Area, Category, TaskPriority, Task, Staff } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,6 +33,8 @@ export default function CreateTaskPage() {
   // Staff data from API
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(true);
+  const [areaList, setAreaList] = useState<string[]>([]);
+  const [categoryList, setCategoryList] = useState<string[]>([]);
   const [manualMode, setManualMode] = useState(false);
 
   // Form state
@@ -51,7 +53,17 @@ export default function CreateTaskPage() {
   // Load staff data on mount
   useEffect(() => {
     loadStaff();
+    loadMasterData();
   }, []);
+
+  const loadMasterData = async () => {
+    const [areasResult, categoriesResult] = await Promise.all([
+      getAreas(),
+      getCategories(),
+    ]);
+    if (areasResult.success && areasResult.data) setAreaList(areasResult.data);
+    if (categoriesResult.success && categoriesResult.data) setCategoryList(categoriesResult.data);
+  };
 
   const loadStaff = async () => {
     setIsLoadingStaff(true);
@@ -299,7 +311,7 @@ export default function CreateTaskPage() {
                   <SelectValue placeholder="Pilih area" />
                 </SelectTrigger>
                 <SelectContent>
-                  {areas.map((a) => (
+                  {areaList.map((a) => (
                     <SelectItem key={a} value={a}>
                       {a}
                     </SelectItem>
@@ -322,7 +334,7 @@ export default function CreateTaskPage() {
                   <SelectValue placeholder="Pilih kategori" />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.map((c) => (
+                  {categoryList.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
