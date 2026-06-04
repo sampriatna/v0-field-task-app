@@ -32,42 +32,15 @@ const API_BASE = "/api/gas";
 
 // Robust normalizer untuk berbagai format response dari GAS
 function normalizeTaskList(data: unknown): Task[] {
-  if (!data) {
-    console.log("[v0] normalizeTaskList: data is null/undefined, returning empty");
-    return [];
-  }
-  
-  // Jika sudah array, return langsung
-  if (Array.isArray(data)) {
-    console.log("[v0] normalizeTaskList: direct array, count:", data.length);
-    return data as Task[];
-  }
-  
-  // Jika object, cari task di berbagai key
+  if (!data) return [];
+  if (Array.isArray(data)) return data as Task[];
   if (typeof data === "object") {
     const obj = data as Record<string, unknown>;
-    
-    if (Array.isArray(obj.tasks)) {
-      console.log("[v0] normalizeTaskList: found in .tasks, count:", obj.tasks.length);
-      return obj.tasks as Task[];
-    }
-    if (Array.isArray(obj.data)) {
-      console.log("[v0] normalizeTaskList: found in .data, count:", obj.data.length);
-      return obj.data as Task[];
-    }
-    if (Array.isArray(obj.rows)) {
-      console.log("[v0] normalizeTaskList: found in .rows, count:", obj.rows.length);
-      return obj.rows as Task[];
-    }
-    if (Array.isArray(obj.items)) {
-      console.log("[v0] normalizeTaskList: found in .items, count:", obj.items.length);
-      return obj.items as Task[];
-    }
-    
-    console.log("[v0] normalizeTaskList: object has no array fields, keys:", Object.keys(obj));
+    if (Array.isArray(obj.tasks)) return obj.tasks as Task[];
+    if (Array.isArray(obj.data)) return obj.data as Task[];
+    if (Array.isArray(obj.rows)) return obj.rows as Task[];
+    if (Array.isArray(obj.items)) return obj.items as Task[];
   }
-  
-  console.log("[v0] normalizeTaskList: no array found, returning empty");
   return [];
 }
 

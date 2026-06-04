@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ClipboardCheck, Lock, AlertCircle } from "lucide-react";
+import { ClipboardCheck, Lock, User, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -28,7 +29,7 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
 
       const data = await response.json();
@@ -37,7 +38,7 @@ export default function LoginPage() {
         router.push("/dashboard");
         router.refresh();
       } else {
-        setError(data.error || "Password salah");
+        setError(data.error || "Username atau password salah");
       }
     } catch {
       setError("Terjadi kesalahan. Coba lagi.");
@@ -49,18 +50,14 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-4 bg-background">
       <div className="w-full max-w-sm space-y-8">
-        {/* Logo and Branding */}
+        {/* Logo */}
         <div className="text-center space-y-4">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground shadow-lg">
             <ClipboardCheck className="w-8 h-8" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">
-              Nusa Food
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Task & Report System
-            </p>
+            <h1 className="text-2xl font-bold text-foreground">Nusa Food</h1>
+            <p className="text-sm text-muted-foreground mt-1">Task &amp; Report System</p>
           </div>
         </div>
 
@@ -79,28 +76,46 @@ export default function LoginPage() {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-3">
               <Lock className="w-5 h-5 text-muted-foreground" />
             </div>
-            <h2 className="text-lg font-semibold">Login Admin</h2>
+            <h2 className="text-lg font-semibold">Masuk ke Sistem</h2>
             <p className="text-sm text-muted-foreground mt-1">
-              Masukkan password untuk mengakses dashboard
+              Gunakan username dan password yang diberikan admin
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="username"
+                  type="text"
+                  placeholder="Masukkan username"
+                  value={username}
+                  onChange={(e) => { setUsername(e.target.value); setError(""); }}
+                  autoFocus
+                  disabled={isLoading}
+                  className="h-12 text-base pl-10"
+                  autoComplete="username"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Masukkan password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError("");
-                }}
-                autoFocus
-                disabled={isLoading}
-                className="h-12 text-base"
-              />
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Masukkan password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setError(""); }}
+                  disabled={isLoading}
+                  className="h-12 text-base pl-10"
+                  autoComplete="current-password"
+                />
+              </div>
             </div>
 
             {error && (
@@ -125,9 +140,12 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          <p className="text-center text-xs text-muted-foreground mt-4">
+            Admin: kosongkan username, gunakan ADMIN_PASSWORD
+          </p>
         </Card>
 
-        {/* Info Text */}
         <p className="text-center text-xs text-muted-foreground">
           Sistem operasional internal untuk manajemen tugas lapangan
         </p>
