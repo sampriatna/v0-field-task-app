@@ -15,6 +15,9 @@ import type {
   Staff,
   CreateStaffPayload,
   UpdateStaffPayload,
+  UserLogin,
+  CreateUserPayload,
+  UpdateUserPayload,
 } from "./types";
 import { 
   mockTasks, 
@@ -868,6 +871,59 @@ export async function activateStaff(staffId: string): Promise<ApiResponse<void>>
       success: false,
       error: error instanceof Error ? error.message : "Gagal mengaktifkan staff",
     };
+  }
+}
+
+// =============================================
+// USER LOGIN MANAGEMENT (GAS v26)
+// =============================================
+
+export async function getUsers(): Promise<ApiResponse<UserLogin[]>> {
+  try {
+    const result = await callApi<unknown>("getUsers", {});
+    if (result.success && result.data) {
+      const raw = Array.isArray(result.data)
+        ? result.data
+        : Array.isArray((result.data as Record<string, unknown>).users)
+        ? ((result.data as Record<string, unknown>).users as unknown[])
+        : Array.isArray((result.data as Record<string, unknown>).data)
+        ? ((result.data as Record<string, unknown>).data as unknown[])
+        : null;
+      if (raw) return { success: true, data: raw as UserLogin[] };
+    }
+    return { success: true, data: [] };
+  } catch {
+    return { success: true, data: [] };
+  }
+}
+
+export async function createUser(payload: CreateUserPayload): Promise<ApiResponse<UserLogin>> {
+  try {
+    const result = await callApi<UserLogin>("createUser", payload as unknown as Record<string, unknown>);
+    if (result.success) return result;
+    return { success: false, error: result.error || "Gagal membuat user" };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Gagal membuat user" };
+  }
+}
+
+export async function updateUser(payload: UpdateUserPayload): Promise<ApiResponse<UserLogin>> {
+  try {
+    const result = await callApi<UserLogin>("updateUser", payload as unknown as Record<string, unknown>);
+    if (result.success) return result;
+    return { success: false, error: result.error || "Gagal mengupdate user" };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Gagal mengupdate user" };
+  }
+}
+
+export async function deleteUser(userId: string): Promise<ApiResponse<void>> {
+  try {
+    const result = await callApi<void>("deleteUser", { user_id: userId });
+    if (result.success) return { success: true };
+    return { success: false, error: result.error || "Gagal menghapus user" };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Gagal menghapus user" };
   }
 }
 

@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     }
 
     const gasBody = {
-      action: "validateLogin",
+      action: "loginUser",
       username: username.trim(),
       password,
       admin_secret: adminApiKey,

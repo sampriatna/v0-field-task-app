@@ -36,6 +36,8 @@ import {
   getChecklistItems,
   saveChecklistItems,
   getStaff,
+  getAreas,
+  getCategories,
 } from "@/lib/api";
 import type {
   RecurringTemplate,
@@ -47,7 +49,7 @@ import type {
   DayOfWeek,
   Staff,
 } from "@/lib/types";
-import { outlets, areas, categories, daysOfWeek } from "@/lib/mock-data";
+import { outlets, daysOfWeek } from "@/lib/mock-data";
 import {
   Plus,
   Edit2,
@@ -100,6 +102,8 @@ export default function RecurringTasksSettingsPage() {
   const { toast } = useToast();
   const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
   const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [areaList, setAreaList] = useState<string[]>([]);
+  const [categoryList, setCategoryList] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -119,12 +123,16 @@ export default function RecurringTasksSettingsPage() {
 
   const loadAll = async () => {
     setIsLoading(true);
-    const [templatesRes, staffRes] = await Promise.all([
+    const [templatesRes, staffRes, areasRes, categoriesRes] = await Promise.all([
       getRecurringTemplates(),
       getStaff(),
+      getAreas(),
+      getCategories(),
     ]);
     if (templatesRes.success && templatesRes.data) setTemplates(templatesRes.data);
     if (staffRes.success && staffRes.data) setStaffList(staffRes.data.filter((s) => s.status === "ACTIVE"));
+    if (areasRes.success && areasRes.data) setAreaList(areasRes.data);
+    if (categoriesRes.success && categoriesRes.data) setCategoryList(categoriesRes.data);
     setIsLoading(false);
   };
 
@@ -578,7 +586,7 @@ export default function RecurringTasksSettingsPage() {
                 <Select value={formData.area} onValueChange={(v) => setFormData({ ...formData, area: v as Area })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {areas.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                    {areaList.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -590,7 +598,7 @@ export default function RecurringTasksSettingsPage() {
                 <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v as Category })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {categoryList.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
