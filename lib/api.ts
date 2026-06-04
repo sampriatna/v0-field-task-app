@@ -902,16 +902,41 @@ export async function activateStaff(staffId: string): Promise<ApiResponse<void>>
 // AREA & CATEGORY MANAGEMENT
 // =============================================
 
+// Normalize area/category item — GAS may return objects or plain strings
+function normalizeStringItem(
+  item: unknown,
+  nameKeys: string[]
+): string | null {
+  if (typeof item === "string" && item.trim()) return item.trim();
+  if (item && typeof item === "object") {
+    const obj = item as Record<string, unknown>;
+    for (const key of nameKeys) {
+      if (typeof obj[key] === "string" && (obj[key] as string).trim()) {
+        return (obj[key] as string).trim();
+      }
+    }
+  }
+  return null;
+}
+
 export async function getAreas(): Promise<ApiResponse<string[]>> {
   try {
     const result = await callApi<unknown>("getAreas", {});
 
     if (result.success && result.data) {
-      if (Array.isArray(result.data)) return { success: true, data: result.data as string[] };
-      if (typeof result.data === "object") {
-        const obj = result.data as Record<string, unknown>;
-        if (Array.isArray(obj.areas)) return { success: true, data: obj.areas as string[] };
-        if (Array.isArray(obj.data)) return { success: true, data: obj.data as string[] };
+      const raw = Array.isArray(result.data)
+        ? result.data
+        : Array.isArray((result.data as Record<string, unknown>).areas)
+        ? ((result.data as Record<string, unknown>).areas as unknown[])
+        : Array.isArray((result.data as Record<string, unknown>).data)
+        ? ((result.data as Record<string, unknown>).data as unknown[])
+        : null;
+
+      if (raw) {
+        const normalized = raw
+          .map((item) => normalizeStringItem(item, ["area_name", "name", "area"]))
+          .filter((s): s is string => s !== null);
+        if (normalized.length > 0) return { success: true, data: normalized };
       }
     }
 
@@ -938,11 +963,19 @@ export async function getCategories(): Promise<ApiResponse<string[]>> {
     const result = await callApi<unknown>("getCategories", {});
 
     if (result.success && result.data) {
-      if (Array.isArray(result.data)) return { success: true, data: result.data as string[] };
-      if (typeof result.data === "object") {
-        const obj = result.data as Record<string, unknown>;
-        if (Array.isArray(obj.categories)) return { success: true, data: obj.categories as string[] };
-        if (Array.isArray(obj.data)) return { success: true, data: obj.data as string[] };
+      const raw = Array.isArray(result.data)
+        ? result.data
+        : Array.isArray((result.data as Record<string, unknown>).categories)
+        ? ((result.data as Record<string, unknown>).categories as unknown[])
+        : Array.isArray((result.data as Record<string, unknown>).data)
+        ? ((result.data as Record<string, unknown>).data as unknown[])
+        : null;
+
+      if (raw) {
+        const normalized = raw
+          .map((item) => normalizeStringItem(item, ["category_name", "name", "category"]))
+          .filter((s): s is string => s !== null);
+        if (normalized.length > 0) return { success: true, data: normalized };
       }
     }
 
