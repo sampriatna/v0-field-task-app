@@ -978,7 +978,19 @@ export async function activateStaff(staffId: string): Promise<ApiResponse<void>>
 
 export async function getAreas(): Promise<ApiResponse<string[]>> {
   try {
-    const result = await callApi<unknown>("getAreas", {});
+    const response = await fetch(`${API_BASE}?action=getAreas`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (response.status === 401) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return { success: true, data: mockAreas };
+    }
+
+    if (!response.ok) return { success: true, data: mockAreas };
+
+    const result = await response.json();
 
     if (result.success && result.data) {
       if (Array.isArray(result.data)) return { success: true, data: result.data as string[] };
@@ -989,7 +1001,6 @@ export async function getAreas(): Promise<ApiResponse<string[]>> {
       }
     }
 
-    // GAS not configured or action returned no usable data — use fallback
     return { success: true, data: mockAreas };
   } catch {
     return { success: true, data: mockAreas };
@@ -998,17 +1009,23 @@ export async function getAreas(): Promise<ApiResponse<string[]>> {
 
 export async function createArea(name: string): Promise<ApiResponse<string>> {
   try {
-    const result = await callApi<{ area?: string; data?: string }>("createArea", { name });
+    const params = new URLSearchParams({ action: "createArea", name });
+    const response = await fetch(`${API_BASE}?${params.toString()}`, {
+      method: "GET",
+      credentials: "include",
+    });
 
-    if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(500);
-      return { success: true, data: name };
+    if (response.status === 401) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return { success: false, error: "Unauthorized" };
     }
 
-    if (result.success && result.data) {
-      return { success: true, data: (result.data.area || result.data.data || name) as string };
-    }
+    if (!response.ok) return { success: false, error: "Gagal menambah area" };
 
+    const result = await response.json();
+    if (result.success) {
+      return { success: true, data: (result.data?.area || result.data?.data || name) as string };
+    }
     return { success: false, error: result.error || "Gagal menambah area" };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Gagal menambah area" };
@@ -1017,7 +1034,19 @@ export async function createArea(name: string): Promise<ApiResponse<string>> {
 
 export async function getCategories(): Promise<ApiResponse<string[]>> {
   try {
-    const result = await callApi<unknown>("getCategories", {});
+    const response = await fetch(`${API_BASE}?action=getCategories`, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (response.status === 401) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return { success: true, data: mockCategories };
+    }
+
+    if (!response.ok) return { success: true, data: mockCategories };
+
+    const result = await response.json();
 
     if (result.success && result.data) {
       if (Array.isArray(result.data)) return { success: true, data: result.data as string[] };
@@ -1028,7 +1057,6 @@ export async function getCategories(): Promise<ApiResponse<string[]>> {
       }
     }
 
-    // GAS not configured or action returned no usable data — use fallback
     return { success: true, data: mockCategories };
   } catch {
     return { success: true, data: mockCategories };
@@ -1037,17 +1065,23 @@ export async function getCategories(): Promise<ApiResponse<string[]>> {
 
 export async function createCategory(name: string): Promise<ApiResponse<string>> {
   try {
-    const result = await callApi<{ category?: string; data?: string }>("createCategory", { name });
+    const params = new URLSearchParams({ action: "createCategory", name });
+    const response = await fetch(`${API_BASE}?${params.toString()}`, {
+      method: "GET",
+      credentials: "include",
+    });
 
-    if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(500);
-      return { success: true, data: name };
+    if (response.status === 401) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return { success: false, error: "Unauthorized" };
     }
 
-    if (result.success && result.data) {
-      return { success: true, data: (result.data.category || result.data.data || name) as string };
-    }
+    if (!response.ok) return { success: false, error: "Gagal menambah kategori" };
 
+    const result = await response.json();
+    if (result.success) {
+      return { success: true, data: (result.data?.category || result.data?.data || name) as string };
+    }
     return { success: false, error: result.error || "Gagal menambah kategori" };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Gagal menambah kategori" };
