@@ -978,58 +978,20 @@ export async function activateStaff(staffId: string): Promise<ApiResponse<void>>
 
 export async function getAreas(): Promise<ApiResponse<string[]>> {
   try {
-    const params = new URLSearchParams({ action: "getAreas" });
-    const url = `${API_BASE}?${params.toString()}`;
-    console.log("[v0] getAreas fetching from:", url);
-    
-    const response = await fetch(url, {
-      method: "GET",
-      credentials: "include",
-    });
+    const result = await callApi<unknown>("getAreas", {});
 
-    console.log("[v0] getAreas response status:", response.status);
-
-    if (response.status === 401) {
-      if (typeof window !== "undefined") window.location.href = "/login";
-      return { success: true, data: mockAreas };
-    }
-
-    if (!response.ok) {
-      console.log("[v0] getAreas response not ok:", response.statusText);
-      return { success: true, data: mockAreas };
-    }
-
-    const result = await response.json();
-    console.log("[v0] getAreas response data:", result);
-
-    // GAS not configured or action not yet implemented — use fallback
-    if (!result || !result.success || result.error) {
-      console.log("[v0] getAreas GAS returned error/not-implemented, using mock");
-      return { success: true, data: mockAreas };
-    }
-
-    if (result.data) {
-      if (Array.isArray(result.data)) {
-        console.log("[v0] getAreas returning data array, length:", result.data.length);
-        return { success: true, data: result.data as string[] };
-      }
+    if (result.success && result.data) {
+      if (Array.isArray(result.data)) return { success: true, data: result.data as string[] };
       if (typeof result.data === "object") {
         const obj = result.data as Record<string, unknown>;
-        if (Array.isArray(obj.areas)) {
-          console.log("[v0] getAreas returning obj.areas, length:", obj.areas.length);
-          return { success: true, data: obj.areas as string[] };
-        }
-        if (Array.isArray(obj.data)) {
-          console.log("[v0] getAreas returning obj.data, length:", obj.data.length);
-          return { success: true, data: obj.data as string[] };
-        }
+        if (Array.isArray(obj.areas)) return { success: true, data: obj.areas as string[] };
+        if (Array.isArray(obj.data)) return { success: true, data: obj.data as string[] };
       }
     }
 
-    console.log("[v0] getAreas fallback to mock (no data found)");
+    // GAS not configured or action returned no usable data — use fallback
     return { success: true, data: mockAreas };
-  } catch (error) {
-    console.error("[v0] getAreas error:", error);
+  } catch {
     return { success: true, data: mockAreas };
   }
 }
@@ -1055,58 +1017,20 @@ export async function createArea(name: string): Promise<ApiResponse<string>> {
 
 export async function getCategories(): Promise<ApiResponse<string[]>> {
   try {
-    const params = new URLSearchParams({ action: "getCategories" });
-    const url = `${API_BASE}?${params.toString()}`;
-    console.log("[v0] getCategories fetching from:", url);
-    
-    const response = await fetch(url, {
-      method: "GET",
-      credentials: "include",
-    });
+    const result = await callApi<unknown>("getCategories", {});
 
-    console.log("[v0] getCategories response status:", response.status);
-
-    if (response.status === 401) {
-      if (typeof window !== "undefined") window.location.href = "/login";
-      return { success: true, data: mockCategories };
-    }
-
-    if (!response.ok) {
-      console.log("[v0] getCategories response not ok:", response.statusText);
-      return { success: true, data: mockCategories };
-    }
-
-    const result = await response.json();
-    console.log("[v0] getCategories response data:", result);
-
-    // GAS not configured or action not yet implemented — use fallback
-    if (!result || !result.success || result.error) {
-      console.log("[v0] getCategories GAS returned error/not-implemented, using mock");
-      return { success: true, data: mockCategories };
-    }
-
-    if (result.data) {
-      if (Array.isArray(result.data)) {
-        console.log("[v0] getCategories returning data array, length:", result.data.length);
-        return { success: true, data: result.data as string[] };
-      }
+    if (result.success && result.data) {
+      if (Array.isArray(result.data)) return { success: true, data: result.data as string[] };
       if (typeof result.data === "object") {
         const obj = result.data as Record<string, unknown>;
-        if (Array.isArray(obj.categories)) {
-          console.log("[v0] getCategories returning obj.categories, length:", obj.categories.length);
-          return { success: true, data: obj.categories as string[] };
-        }
-        if (Array.isArray(obj.data)) {
-          console.log("[v0] getCategories returning obj.data, length:", obj.data.length);
-          return { success: true, data: obj.data as string[] };
-        }
+        if (Array.isArray(obj.categories)) return { success: true, data: obj.categories as string[] };
+        if (Array.isArray(obj.data)) return { success: true, data: obj.data as string[] };
       }
     }
 
-    console.log("[v0] getCategories fallback to mock (no data found)");
+    // GAS not configured or action returned no usable data — use fallback
     return { success: true, data: mockCategories };
-  } catch (error) {
-    console.error("[v0] getCategories error:", error);
+  } catch {
     return { success: true, data: mockCategories };
   }
 }
