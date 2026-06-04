@@ -904,19 +904,7 @@ export async function activateStaff(staffId: string): Promise<ApiResponse<void>>
 
 export async function getAreas(): Promise<ApiResponse<string[]>> {
   try {
-    const response = await fetch(`${API_BASE}?action=getAreas`, {
-      method: "GET",
-      credentials: "include",
-    });
-
-    if (response.status === 401) {
-      if (typeof window !== "undefined") window.location.href = "/login";
-      return { success: true, data: mockAreas };
-    }
-
-    if (!response.ok) return { success: true, data: mockAreas };
-
-    const result = await response.json();
+    const result = await callApi<unknown>("getAreas", {});
 
     if (result.success && result.data) {
       if (Array.isArray(result.data)) return { success: true, data: result.data as string[] };
@@ -935,20 +923,7 @@ export async function getAreas(): Promise<ApiResponse<string[]>> {
 
 export async function createArea(name: string): Promise<ApiResponse<string>> {
   try {
-    const params = new URLSearchParams({ action: "createArea", name });
-    const response = await fetch(`${API_BASE}?${params.toString()}`, {
-      method: "GET",
-      credentials: "include",
-    });
-
-    if (response.status === 401) {
-      if (typeof window !== "undefined") window.location.href = "/login";
-      return { success: false, error: "Unauthorized" };
-    }
-
-    if (!response.ok) return { success: false, error: "Gagal menambah area" };
-
-    const result = await response.json();
+    const result = await callApi<Record<string, unknown>>("createArea", { name });
     if (result.success) {
       return { success: true, data: (result.data?.area || result.data?.data || name) as string };
     }
@@ -960,19 +935,7 @@ export async function createArea(name: string): Promise<ApiResponse<string>> {
 
 export async function getCategories(): Promise<ApiResponse<string[]>> {
   try {
-    const response = await fetch(`${API_BASE}?action=getCategories`, {
-      method: "GET",
-      credentials: "include",
-    });
-
-    if (response.status === 401) {
-      if (typeof window !== "undefined") window.location.href = "/login";
-      return { success: true, data: mockCategories };
-    }
-
-    if (!response.ok) return { success: true, data: mockCategories };
-
-    const result = await response.json();
+    const result = await callApi<unknown>("getCategories", {});
 
     if (result.success && result.data) {
       if (Array.isArray(result.data)) return { success: true, data: result.data as string[] };
@@ -991,20 +954,7 @@ export async function getCategories(): Promise<ApiResponse<string[]>> {
 
 export async function createCategory(name: string): Promise<ApiResponse<string>> {
   try {
-    const params = new URLSearchParams({ action: "createCategory", name });
-    const response = await fetch(`${API_BASE}?${params.toString()}`, {
-      method: "GET",
-      credentials: "include",
-    });
-
-    if (response.status === 401) {
-      if (typeof window !== "undefined") window.location.href = "/login";
-      return { success: false, error: "Unauthorized" };
-    }
-
-    if (!response.ok) return { success: false, error: "Gagal menambah kategori" };
-
-    const result = await response.json();
+    const result = await callApi<Record<string, unknown>>("createCategory", { name });
     if (result.success) {
       return { success: true, data: (result.data?.category || result.data?.data || name) as string };
     }
