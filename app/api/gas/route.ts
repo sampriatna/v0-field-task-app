@@ -49,6 +49,19 @@ const ADMIN_ACTIONS = [
   "createUser",
   "updateUser",
   "deleteUser",
+  "getChecklistTemplates",
+  "createChecklistTemplate",
+  "updateChecklistTemplate",
+  "getChecklistItems",
+  "saveChecklistItems",
+  "generateChecklistReport",
+  "getChecklistReports",
+  "getChecklistDetail",
+  "getChecklistByToken",
+  "submitChecklistReport",
+  "approveChecklist",
+  "requestChecklistRevision",
+  "resendChecklistWhatsApp",
 ];
 
 // Actions that are public (staff report pages) - no LOGIN needed, but still need admin_secret for GAS
