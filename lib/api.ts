@@ -57,7 +57,7 @@ function normalizeStaffFromGAS(gasStaff: Record<string, unknown>): Staff {
     area: (gasStaff.area || "Dapur") as Staff["area"],
     wa_number: String(gasStaff.wa_number || ""),
     role: (gasStaff.role || "STAFF") as Staff["role"],
-    status: gasStaff.is_active === "TRUE" || gasStaff.is_active === true || gasStaff.is_active === "ACTIVE" || gasStaff.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
+    status: gasStaff.is_active === "TRUE" || gasStaff.is_active === true || gasStaff.is_active === "ACTIVE" || gasStaff.status === "ACTIVE" || gasStaff.active_status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
     created_at: String(gasStaff.created_at || ""),
     updated_at: String(gasStaff.last_updated || gasStaff.updated_at || ""),
   };
@@ -536,8 +536,7 @@ export async function saveChecklistItems(
   items: Omit<ChecklistItem, "checklist_item_id" | "template_id">[]
 ): Promise<ApiResponse<ChecklistItem[]>> {
   try {
-    // Try saveChecklistTemplate first (GAS v26), fallback to saveChecklistItems
-    const result = await callApi<ChecklistItem[]>("saveChecklistTemplate", {
+    const result = await callApi<ChecklistItem[]>("saveChecklistItems", {
       template_id: templateId,
       items,
     });
@@ -552,12 +551,7 @@ export async function saveChecklistItems(
       return { success: true, data: savedItems };
     }
 
-    // If success, normalize response
-    if (result.success) {
-      return result;
-    }
-
-    return { success: false, error: result.error || "Gagal menyimpan item checklist" };
+    return result;
   } catch (error) {
     return {
       success: false,
@@ -620,6 +614,29 @@ export async function submitChecklistReport(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Gagal mengirim laporan checklist",
+    };
+  }
+}
+
+export async function generateChecklistReport(templateId: string): Promise<ApiResponse<{ task?: { task_id: string } }>> {
+  try {
+    const result = await callApi<{ task?: { task_id: string } }>("generateChecklistReport", {
+      template_id: templateId,
+    });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(1000);
+      return {
+        success: true,
+        data: { task: { task_id: `CHK-${templateId}-${Date.now()}` } },
+      };
+    }
+
+    return result;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal membuat checklist report",
     };
   }
 }
