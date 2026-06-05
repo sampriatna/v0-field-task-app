@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MobileHeader } from "@/components/mobile-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,33 +14,37 @@ import {
   Layers,
   LogOut,
   ChevronRight,
+  RepeatIcon,
+  ShieldCheck,
 } from "lucide-react";
-import { outlets, areas, categories, staffList } from "@/lib/mock-data";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { getStaff } from "@/lib/api";
+import type { Staff } from "@/lib/types";
 
 export default function SettingsPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [staffPreview, setStaffPreview] = useState<Staff[]>([]);
+
+  useEffect(() => {
+    getStaff().then((result) => {
+      if (result.success && result.data) {
+        setStaffPreview(result.data.filter((s) => s.status === "ACTIVE").slice(0, 3));
+      }
+    });
+  }, []);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        credentials: "include",
-      });
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
       router.push("/login");
       router.refresh();
-    } catch (error) {
-      console.error("Logout error:", error);
-      toast({
-        title: "Error",
-        description: "Gagal logout. Silakan coba lagi.",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Error", description: "Gagal logout. Silakan coba lagi.", variant: "destructive" });
     } finally {
       setIsLoggingOut(false);
     }
@@ -58,109 +62,33 @@ export default function SettingsPage() {
               <Database className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">
-                Google Apps Script
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Status koneksi ke backend Google Sheets
-              </p>
+              <h3 className="font-semibold text-foreground">Google Apps Script</h3>
+              <p className="text-sm text-muted-foreground">Status koneksi ke backend Google Sheets</p>
             </div>
           </div>
-
           <div className="flex items-center gap-2 p-3 bg-emerald-50 rounded-lg">
             <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-            <span className="text-sm text-emerald-800 font-medium">
-              Terhubung via Environment Variable
-            </span>
+            <span className="text-sm text-emerald-800 font-medium">Terhubung via Environment Variable</span>
           </div>
-
           <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg text-sm">
             <Info className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
             <p className="text-blue-800">
-              GAS URL dan API Key dikonfigurasi melalui environment variables
-              (GAS_WEB_APP_URL dan ADMIN_API_KEY). Token Fonnte disimpan di
-              Google Apps Script.
+              GAS URL dan API Key dikonfigurasi melalui environment variables (GAS_WEB_APP_URL dan ADMIN_API_KEY).
             </p>
-          </div>
-        </Card>
-
-        {/* Outlets */}
-        <Card className="p-4 space-y-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Building2 className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">Daftar Outlet</h3>
-              <p className="text-sm text-muted-foreground">
-                Outlet yang tersedia dalam sistem
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {outlets.map((outlet) => (
-              <Badge key={outlet} variant="secondary">
-                {outlet}
-              </Badge>
-            ))}
-          </div>
-        </Card>
-
-        {/* Areas & Categories */}
-        <Card className="p-4 space-y-4">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Layers className="w-5 h-5 text-primary" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground">Area & Kategori</h3>
-              <p className="text-sm text-muted-foreground">
-                Daftar area dan kategori tugas
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2">
-              Area:
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {areas.map((area) => (
-                <Badge key={area} variant="outline" className="text-xs">
-                  {area}
-                </Badge>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2">
-              Kategori:
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {categories.map((category) => (
-                <Badge key={category} variant="outline" className="text-xs">
-                  {category}
-                </Badge>
-              ))}
-            </div>
           </div>
         </Card>
 
         {/* Master Area */}
         <Link href="/settings/areas">
-          <Card className="p-4 space-y-4 hover:border-primary/50 transition-colors cursor-pointer">
+          <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer">
             <div className="flex items-center justify-between">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                  <Layers className="w-5 h-5 text-primary" />
+                  <Building2 className="w-5 h-5 text-primary" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">Master Area</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Kelola daftar area kerja (Dapur, Bar, Ruang Tamu, dll)
-                  </p>
+                  <p className="text-sm text-muted-foreground">Kelola daftar area kerja (Dapur, Bar, Ruang Tamu, dll)</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
@@ -170,7 +98,7 @@ export default function SettingsPage() {
 
         {/* Master Kategori */}
         <Link href="/settings/categories">
-          <Card className="p-4 space-y-4 hover:border-primary/50 transition-colors cursor-pointer">
+          <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer">
             <div className="flex items-center justify-between">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -178,9 +106,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">Master Kategori</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Kelola kategori tugas (Cleaning, Maintenance, Setup, dll)
-                  </p>
+                  <p className="text-sm text-muted-foreground">Kelola kategori tugas (Cleaning, Maintenance, Setup, dll)</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
@@ -188,9 +114,9 @@ export default function SettingsPage() {
           </Card>
         </Link>
 
-        {/* Staff List - Link to Staff Master */}
+        {/* Master Staff */}
         <Link href="/settings/staff">
-          <Card className="p-4 space-y-4 hover:border-primary/50 transition-colors cursor-pointer">
+          <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer">
             <div className="flex items-center justify-between">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -198,36 +124,59 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">Master Staff</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Kelola daftar staff, posisi, dan nomor WhatsApp
-                  </p>
+                  <p className="text-sm text-muted-foreground">Kelola daftar staff, posisi, dan nomor WhatsApp</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </div>
-
-            <div className="space-y-2">
-              {staffList.slice(0, 3).map((staff) => (
-                <div
-                  key={staff.name}
-                  className="flex items-center justify-between p-2 bg-muted/50 rounded-lg"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {staff.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{staff.wa}</p>
+            {staffPreview.length > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {staffPreview.map((staff) => (
+                  <div key={staff.staff_id} className="flex items-center justify-between p-2 bg-muted/50 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{staff.name}</p>
+                      <p className="text-xs text-muted-foreground">{staff.wa_number}</p>
+                    </div>
+                    <Badge variant="secondary" className="text-xs">{staff.outlet}</Badge>
                   </div>
-                  <Badge variant="secondary" className="text-xs">
-                    {staff.outlet}
-                  </Badge>
+                ))}
+              </div>
+            )}
+          </Card>
+        </Link>
+
+        {/* Manajemen User Login */}
+        <Link href="/settings/users">
+          <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5 text-primary" />
                 </div>
-              ))}
-              {staffList.length > 3 && (
-                <p className="text-xs text-muted-foreground text-center">
-                  +{staffList.length - 3} staff lainnya
-                </p>
-              )}
+                <div>
+                  <h3 className="font-semibold text-foreground">Manajemen User Login</h3>
+                  <p className="text-sm text-muted-foreground">Atur username, password, dan hak akses per staff</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </Card>
+        </Link>
+
+        {/* Tugas Berulang */}
+        <Link href="/settings/recurring-tasks">
+          <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <RepeatIcon className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Template Tugas Berulang</h3>
+                  <p className="text-sm text-muted-foreground">Buat dan kelola checklist + PIC untuk tugas berulang</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </div>
           </Card>
         </Link>
@@ -235,20 +184,15 @@ export default function SettingsPage() {
         {/* System Info */}
         <Card className="p-4">
           <p className="text-xs text-muted-foreground text-center">
-            Nusa Food Task & Report System v1.0
+            Nusa Food Task &amp; Report System v1.0
             <br />
             Data disimpan ke Google Sheets via Apps Script
           </p>
         </Card>
 
-        {/* Logout Button */}
+        {/* Logout */}
         <Card className="p-4">
-          <Button
-            variant="destructive"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="w-full"
-          >
+          <Button variant="destructive" onClick={handleLogout} disabled={isLoggingOut} className="w-full">
             {isLoggingOut ? (
               <span className="flex items-center gap-2">
                 <span className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />

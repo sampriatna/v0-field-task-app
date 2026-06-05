@@ -87,13 +87,15 @@ export function MasterAreaForm({ areas, onAreasUpdated }: MasterAreaFormProps) {
           </div>
         ) : (
           <div className="space-y-2">
-            {areas.map((area) => (
+            {areas.map((area, index) => {
+              const label = typeof area === "string" ? area : (area as Record<string, unknown>).area_name as string || String(area);
+              return (
               <div
-                key={area}
+                key={label || index}
                 className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
               >
                 <span className="text-sm font-medium text-foreground">
-                  {area}
+                  {label}
                 </span>
                 <Button
                   variant="ghost"
@@ -104,7 +106,8 @@ export function MasterAreaForm({ areas, onAreasUpdated }: MasterAreaFormProps) {
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>

@@ -286,3 +286,33 @@ export interface LeaderSession {
   role: StaffRole;
   login_time: number; // timestamp
 }
+
+// User login record from GAS getUsers / createUser / updateUser
+export interface UserLogin {
+  user_id: string;
+  staff_id: string;
+  username: string;
+  role: StaffRole;
+  outlet?: string;
+  name?: string;
+  wa_number?: string;
+  login_enabled: boolean;
+  created_at?: string;
+  last_login?: string;
+}
+
+export interface CreateUserPayload {
+  staff_id: string;
+  username: string;
+  password: string;
+  role: StaffRole;
+  login_enabled?: boolean;
+}
+
+export interface UpdateUserPayload {
+  user_id: string;
+  username?: string;
+  password?: string;
+  role?: StaffRole;
+  login_enabled?: boolean;
+}

@@ -16,16 +16,23 @@ export interface SessionPayload {
   isAdmin: boolean;
   loginAt: number;
   expiresAt: number;
+  userId?: string;
+  userName?: string;
+  userRole?: string; // "ADMIN" | "LEADER" | "STAFF" | "owner"
+  userOutlet?: string;
 }
 
-export async function createSession(): Promise<string> {
+export async function createSession(extra?: Partial<SessionPayload>): Promise<string> {
   const expiresAt = Date.now() + SESSION_DURATION * 1000;
-  
-  const token = await new SignJWT({
+
+  const payload: SessionPayload = {
     isAdmin: true,
     loginAt: Date.now(),
     expiresAt,
-  } satisfies SessionPayload)
+    ...extra,
+  };
+
+  const token = await new SignJWT(payload as Parameters<SignJWT["sign"]>[0])
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(expiresAt / 1000)
@@ -37,7 +44,7 @@ export async function createSession(): Promise<string> {
 export async function verifySession(token: string): Promise<SessionPayload | null> {
   try {
     const { payload } = await jwtVerify(token, getSecretKey());
-    
+
     if (
       typeof payload.isAdmin !== "boolean" ||
       typeof payload.loginAt !== "number" ||
@@ -46,15 +53,18 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
       return null;
     }
 
-    // Check if session has expired
-    if (payload.expiresAt < Date.now()) {
+    if ((payload.expiresAt as number) < Date.now()) {
       return null;
     }
 
     return {
-      isAdmin: payload.isAdmin,
-      loginAt: payload.loginAt,
-      expiresAt: payload.expiresAt,
+      isAdmin: payload.isAdmin as boolean,
+      loginAt: payload.loginAt as number,
+      expiresAt: payload.expiresAt as number,
+      userId: payload.userId as string | undefined,
+      userName: payload.userName as string | undefined,
+      userRole: payload.userRole as string | undefined,
+      userOutlet: payload.userOutlet as string | undefined,
     };
   } catch {
     return null;

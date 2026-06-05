@@ -17,6 +17,7 @@ import {
   Loader2,
   Save,
   ArrowLeft,
+  Send,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,6 +26,7 @@ import {
   getRecurringTemplate,
   getChecklistItems,
   saveChecklistItems,
+  generateChecklistReport,
 } from "@/lib/api";
 import type { RecurringTemplate, ChecklistItem } from "@/lib/types";
 
@@ -48,6 +50,7 @@ export default function ChecklistTemplatePage({
   const [items, setItems] = useState<ChecklistItemForm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
@@ -127,17 +130,6 @@ export default function ChecklistTemplatePage({
   };
 
   const handleSave = async () => {
-    // Validate
-    const emptyItems = items.filter((item) => !item.item_text.trim());
-    if (emptyItems.length > 0) {
-      toast({
-        title: "Validasi Gagal",
-        description: "Semua item checklist harus memiliki teks",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsSaving(true);
     try {
       const itemsToSave = items.map((item, index) => ({
@@ -167,6 +159,34 @@ export default function ChecklistTemplatePage({
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleGenerateChecklist = async () => {
+    setIsGenerating(true);
+    try {
+      const result = await generateChecklistReport(templateId);
+
+      if (result.success) {
+        const taskId = result.data?.task?.task_id;
+        if (taskId) {
+          toast({
+            title: "Checklist Berhasil Dibuat",
+            description: "Checklist telah dikirim ke staff",
+          });
+          router.push(`/checklists/${taskId}`);
+        }
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      toast({
+        title: "Gagal Membuat Checklist",
+        description: error instanceof Error ? error.message : "Terjadi kesalahan",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -324,10 +344,31 @@ export default function ChecklistTemplatePage({
       </div>
 
       {/* Fixed Bottom Save Bar */}
-      {hasChanges && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t">
-          <div className="max-w-2xl mx-auto">
-            <Button onClick={handleSave} disabled={isSaving} className="w-full h-12">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t">
+        <div className="max-w-2xl mx-auto flex gap-3">
+          <Button
+            onClick={handleGenerateChecklist}
+            disabled={isGenerating || isSaving}
+            className="flex-1 h-12 bg-green-600 hover:bg-green-700"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Membuat...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4 mr-2" />
+                Kirim Checklist
+              </>
+            )}
+          </Button>
+          {hasChanges && (
+            <Button
+              onClick={handleSave}
+              disabled={isSaving || isGenerating}
+              className="flex-1 h-12"
+            >
               {isSaving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -336,13 +377,13 @@ export default function ChecklistTemplatePage({
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-2" />
-                  Simpan Perubahan
+                  Simpan
                 </>
               )}
             </Button>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

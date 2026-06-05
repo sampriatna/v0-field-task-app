@@ -107,59 +107,36 @@ export default function DashboardPage() {
 
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Timeout wrapper for API calls
-  const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error("Request timeout")), ms)
-      ),
-    ]);
-  };
-
   const loadData = async () => {
     setIsLoading(true);
     setLoadError(null);
-    console.log("[v0] Dashboard: Starting to load data...");
-    
+
     try {
-      // Load tasks with 15 second timeout
-      console.log("[v0] Dashboard: Calling getTasks()...");
-      const tasksResult = await withTimeout(getTasks(), 15000);
-      console.log("[v0] Dashboard: getTasks() returned:", tasksResult.success ? "success" : "error", tasksResult.error || "");
-      
+      const tasksResult = await getTasks();
+
       if (tasksResult.success && tasksResult.data) {
-        console.log("[v0] Dashboard: Tasks loaded, count:", tasksResult.data.length);
         setTasks(tasksResult.data);
         setSummary(calculateTaskSummary(tasksResult.data));
         setChecklistSummary(calculateChecklistSummary(tasksResult.data));
       } else {
-        // If tasks fail, still show empty dashboard
-        console.log("[v0] Dashboard: Tasks failed, showing error");
         setTasks([]);
         setLoadError(tasksResult.error || "Gagal memuat tugas");
       }
-      
+
       // Load checklists separately (non-blocking)
       try {
-        console.log("[v0] Dashboard: Calling getChecklistReports()...");
-        const checklistsResult = await withTimeout(getChecklistReports(), 10000);
+        const checklistsResult = await getChecklistReports();
         if (checklistsResult.success && checklistsResult.data) {
-          console.log("[v0] Dashboard: Checklists loaded, count:", checklistsResult.data.length);
           setChecklists(checklistsResult.data);
         }
-      } catch (error) {
+      } catch {
         // Checklist error is non-fatal
-        console.log("[v0] Dashboard: Checklists failed (non-blocking):", error);
       }
     } catch (error) {
-      console.error("[v0] Dashboard: Failed to load dashboard:", error);
       setLoadError(error instanceof Error ? error.message : "Gagal memuat data");
-      // Still show empty dashboard instead of crashing
       setTasks([]);
     } finally {
       setIsLoading(false);
-      console.log("[v0] Dashboard: Finished loading");
     }
   };
 
@@ -199,12 +176,10 @@ export default function DashboardPage() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    console.log("[v0] Dashboard: Manual refresh triggered");
     try {
       await loadData();
     } finally {
       setIsRefreshing(false);
-      console.log("[v0] Dashboard: Manual refresh completed");
     }
   };
 

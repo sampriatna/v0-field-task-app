@@ -90,13 +90,15 @@ export function MasterCategoryForm({
           </div>
         ) : (
           <div className="space-y-2">
-            {categories.map((category) => (
+            {categories.map((category, index) => {
+              const label = typeof category === "string" ? category : (category as Record<string, unknown>).category_name as string || String(category);
+              return (
               <div
-                key={category}
+                key={label || index}
                 className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
               >
                 <span className="text-sm font-medium text-foreground">
-                  {category}
+                  {label}
                 </span>
                 <Button
                   variant="ghost"
@@ -107,7 +109,8 @@ export function MasterCategoryForm({
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>
