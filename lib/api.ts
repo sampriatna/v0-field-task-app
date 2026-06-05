@@ -536,7 +536,8 @@ export async function saveChecklistItems(
   items: Omit<ChecklistItem, "checklist_item_id" | "template_id">[]
 ): Promise<ApiResponse<ChecklistItem[]>> {
   try {
-    const result = await callApi<ChecklistItem[]>("saveChecklistItems", {
+    // Try saveChecklistTemplate first (GAS v26), fallback to saveChecklistItems
+    const result = await callApi<ChecklistItem[]>("saveChecklistTemplate", {
       template_id: templateId,
       items,
     });
@@ -551,7 +552,12 @@ export async function saveChecklistItems(
       return { success: true, data: savedItems };
     }
 
-    return result;
+    // If success, normalize response
+    if (result.success) {
+      return result;
+    }
+
+    return { success: false, error: result.error || "Gagal menyimpan item checklist" };
   } catch (error) {
     return {
       success: false,

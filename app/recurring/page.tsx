@@ -42,7 +42,9 @@ import {
   createRecurringTemplate,
   updateRecurringTemplate,
   toggleRecurringTemplateStatus,
+  getStaff,
 } from "@/lib/api";
+import type { Staff } from "@/lib/types";
 import type {
   RecurringTemplate,
   CreateRecurringTemplatePayload,
@@ -52,7 +54,7 @@ import type {
   RepeatType,
   DayOfWeek,
 } from "@/lib/types";
-import { outlets, areas, categories, staffList, daysOfWeek } from "@/lib/mock-data";
+import { outlets, areas, categories, daysOfWeek } from "@/lib/mock-data";
 
 const repeatTypeOptions: { value: RepeatType; label: string }[] = [
   { value: "daily", label: "Setiap Hari" },
@@ -79,6 +81,7 @@ const initialFormState: CreateRecurringTemplatePayload = {
 export default function RecurringPage() {
   const { toast } = useToast();
   const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,7 +90,15 @@ export default function RecurringPage() {
 
   useEffect(() => {
     loadTemplates();
+    loadStaff();
   }, []);
+
+  const loadStaff = async () => {
+    const result = await getStaff();
+    if (result.success && result.data) {
+      setStaffList(result.data.filter((s) => s.status === "ACTIVE"));
+    }
+  };
 
   const loadTemplates = async () => {
     setIsLoading(true);
@@ -212,7 +223,7 @@ export default function RecurringPage() {
   const handleStaffSelect = (name: string) => {
     const staff = staffList.find((s) => s.name === name);
     if (staff) {
-      setFormData({ ...formData, pic_name: staff.name, pic_wa: staff.wa });
+      setFormData({ ...formData, pic_name: staff.name, pic_wa: staff.wa_number });
     }
   };
 
