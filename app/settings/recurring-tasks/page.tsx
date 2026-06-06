@@ -76,10 +76,11 @@ interface ChecklistItemForm {
   active_status: boolean;
 }
 
-const repeatTypeOptions: { value: RepeatType; label: string }[] = [
-  { value: "daily", label: "Setiap Hari" },
-  { value: "weekly", label: "Mingguan" },
-  { value: "custom", label: "Pilih Hari" },
+const repeatTypeOptions: { value: RepeatType; label: string; description?: string }[] = [
+  { value: "daily", label: "Setiap Hari", description: "Tugas dijalankan setiap hari" },
+  { value: "weekdays", label: "Hari Kerja (Senin-Jumat)", description: "Setiap hari Senin sampai Jumat" },
+  { value: "weekly", label: "Mingguan", description: "Pilih hari-hari tertentu dalam seminggu" },
+  { value: "monthly", label: "Setiap Bulan", description: "Dijalankan satu kali setiap bulan" },
 ];
 
 const initialFormState: CreateRecurringTemplatePayload = {
@@ -206,12 +207,16 @@ export default function RecurringTasksSettingsPage() {
   };
 
   const handleRepeatTypeChange = (value: RepeatType) => {
-    const newDays: DayOfWeek[] =
-      value === "daily"
-        ? ["senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu"]
-        : value === "weekly"
-        ? ["senin"]
-        : [];
+    let newDays: DayOfWeek[];
+    if (value === "daily") {
+      newDays = ["senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu"];
+    } else if (value === "weekdays") {
+      newDays = ["senin", "selasa", "rabu", "kamis", "jumat"];
+    } else if (value === "weekly") {
+      newDays = ["senin"];
+    } else {
+      newDays = [];
+    }
     setFormData({ ...formData, repeat_type: value, repeat_days: newDays });
   };
 
@@ -653,7 +658,7 @@ export default function RecurringTasksSettingsPage() {
               </Select>
             </div>
 
-            {(formData.repeat_type === "weekly" || formData.repeat_type === "custom") && (
+            {formData.repeat_type === "weekly" && (
               <div className="space-y-2">
                 <Label>Pilih Hari</Label>
                 <div className="flex flex-wrap gap-2">
