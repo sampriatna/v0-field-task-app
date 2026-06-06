@@ -57,6 +57,7 @@ import type {
   DayOfWeek,
 } from "@/lib/types";
 import { outlets, daysOfWeek } from "@/lib/mock-data";
+
 const repeatTypeOptions: { value: RepeatType; label: string; description?: string }[] = [
   { value: "daily", label: "Setiap Hari", description: "Tugas dijalankan setiap hari" },
   { value: "weekdays", label: "Hari Kerja (Senin-Jumat)", description: "Setiap hari Senin sampai Jumat" },
@@ -130,7 +131,7 @@ export default function RecurringPage() {
         pic_wa: template.pic_wa,
         task_title: template.task_title,
         task_description: template.task_description,
-        repeat_type: template.repeat_type.toLowerCase(),
+        repeat_type: (template.repeat_type || "daily").toLowerCase(),
         repeat_days: template.repeat_days,
         repeat_time: template.repeat_time,
         deadline_time: template.deadline_time,
@@ -239,12 +240,29 @@ export default function RecurringPage() {
   };
 
   const getRepeatLabel = (template: RecurringTemplate) => {
-    if (template.repeat_type === "daily") return "Setiap Hari";
-    if (template.repeat_type === "weekly") {
-      const day = daysOfWeek.find((d) => d.value === template.repeat_days[0]);
-      return `Setiap ${day?.label || "Senin"}`;
+    const rt = (template.repeat_type || "daily").toLowerCase();
+    if (rt === "daily") return "Setiap Hari";
+    if (rt === "weekdays") return "Senin - Jumat (5 hari/minggu)";
+    if (rt === "weekends") return "Sabtu & Minggu";
+    if (rt === "monthly") {
+      const days = Array.isArray(template.repeat_days) ? template.repeat_days : (template.repeat_days || "").split(",").map((d: string) => d.trim()).filter(Boolean);
+      return days.length > 0 ? "Tgl " + days.join(", ") + " setiap bulan" : "Bulanan";
     }
-    return `${template.repeat_days.length} hari/minggu`;
+    if (rt === "weekly" || rt === "custom") {
+      const daysOfWeek = [
+        { value: "senin", label: "Senin" }, { value: "selasa", label: "Selasa" },
+        { value: "rabu", label: "Rabu" }, { value: "kamis", label: "Kamis" },
+        { value: "jumat", label: "Jumat" }, { value: "sabtu", label: "Sabtu" },
+        { value: "minggu", label: "Minggu" },
+      ];
+      const dayList = Array.isArray(template.repeat_days) ? template.repeat_days : (template.repeat_days || "").split(",").map((d: string) => d.trim()).filter(Boolean);
+      if (dayList.length === 1) {
+        const day = daysOfWeek.find(d => d.value === dayList[0]);
+        return "Setiap " + (day ? day.label : dayList[0]);
+      }
+      return dayList.length + " hari/minggu";
+    }
+    return template.repeat_days ? String(template.repeat_days) + " (tidak dikenal)" : "Tidak diset";
   };
 
   const filteredStaff = staffList.filter((s) => s.outlet === formData.outlet);

@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
   // Calculate checklist summary from tasks with checklist_mode === "YES"
   const calculateChecklistSummary = (taskList: Task[]): ChecklistSummary => {
-    const checklistTasks = taskList.filter(t => t.checklist_mode === "YES");
+    const checklistTasks = taskList.filter(t => t.checklist_mode === "YES" || t.task_id?.startsWith("CHK-TSK-"));
     
     const openStatuses = ["CREATED", "SENT", "WA_FAILED", "OPEN", "OPENED"];
     const submittedStatuses = ["SUBMITTED", "RESUBMITTED", "WAITING_VERIFICATION"];
@@ -142,7 +142,7 @@ export default function DashboardPage() {
 
   // Filter tasks: manual tasks (non-checklist) and checklist tasks
   const manualTasks = tasks.filter(t => t.checklist_mode !== "YES");
-  const checklistTasks = tasks.filter(t => t.checklist_mode === "YES");
+  const checklistTasks = tasks.filter(t => t.checklist_mode === "YES" || t.task_id?.startsWith("CHK-TSK-"));
 
   const filteredTasks = manualTasks.filter((task) => {
     if (searchQuery) {
@@ -158,11 +158,11 @@ export default function DashboardPage() {
     return true;
   });
 
-  const filteredChecklists = checklists.filter((checklist) => {
+  const filteredChecklists = checklistTasks.filter((checklist) => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       const matchesSearch =
-        checklist.checklist_title.toLowerCase().includes(query) ||
+        (checklist.checklist_title || checklist.task_title || '').toLowerCase().includes(query) ||
         checklist.task_id.toLowerCase().includes(query) ||
         checklist.pic_name.toLowerCase().includes(query);
       if (!matchesSearch) return false;
@@ -517,7 +517,7 @@ export default function DashboardPage() {
                                 <StatusBadge status={checklist.status} />
                                 <span className="text-xs text-muted-foreground">{checklist.task_id}</span>
                               </div>
-                              <h3 className="font-medium text-foreground truncate">{checklist.checklist_title}</h3>
+                              <h3 className="font-medium text-foreground truncate">{checklist.checklist_title || checklist.task_title}</h3>
                               <p className="text-sm text-muted-foreground">
                                 {checklist.outlet} - {checklist.area} | PIC: {checklist.pic_name}
                               </p>
