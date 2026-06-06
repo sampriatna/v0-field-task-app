@@ -289,8 +289,8 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
       "GET"
     );
 
-    // GAS not configured OR GAS returned any error (e.g. UNKNOWN_ACTION) → use mock
-    if (!result.success || result.error) {
+    // GAS not configured → show mock data so app still works without GAS
+    if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(300);
       let tasks = [...mockTasks];
       if (filters?.outlet) tasks = tasks.filter((t) => t.outlet === filters.outlet);
@@ -301,14 +301,24 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
       return { success: true, data: tasks };
     }
 
+    // GAS returned a real error (not network) — surface it to the UI
+    if (!result.success && result.error) {
+      return { success: false, error: result.error };
+    }
+
     if (result.success && result.data !== undefined) {
       const list = normalizeTaskList(result.data);
       return { success: true, data: list };
     }
 
-    return { success: true, data: mockTasks };
+    return { success: true, data: [] };
   } catch {
-    return { success: true, data: mockTasks };
+    // Network failure — fallback to mock
+    await delay(300);
+    let tasks = [...mockTasks];
+    if (filters?.outlet) tasks = tasks.filter((t) => t.outlet === filters.outlet);
+    if (filters?.status) tasks = tasks.filter((t) => t.status === filters.status);
+    return { success: true, data: tasks };
   }
 }
 
@@ -408,8 +418,10 @@ export async function resendWhatsApp(taskId: string): Promise<ApiResponse<void>>
 export async function getRecurringTemplates(): Promise<ApiResponse<RecurringTemplate[]>> {
   try {
     const result = await callApi<RecurringTemplate[]>("getRecurringTemplates", undefined, "GET");
-    if (!result.success || result.error) return { success: true, data: mockRecurringTemplates };
-    return result;
+    // Only fall back to mock when GAS is not configured at all
+    if (result.error === "GAS_NOT_CONFIGURED") return { success: true, data: mockRecurringTemplates };
+    if (!result.success) return { success: false, error: result.error || "Gagal mengambil template" };
+    return { success: true, data: result.data ?? [] };
   } catch {
     return { success: true, data: mockRecurringTemplates };
   }
@@ -418,11 +430,14 @@ export async function getRecurringTemplates(): Promise<ApiResponse<RecurringTemp
 export async function getRecurringTemplate(templateId: string): Promise<ApiResponse<RecurringTemplate>> {
   try {
     const result = await callApi<RecurringTemplate>("getRecurringTemplate", { template_id: templateId }, "GET");
-    if (!result.success || result.error) {
+    if (result.error === "GAS_NOT_CONFIGURED") {
       const template = mockRecurringTemplates.find(t => t.template_id === templateId);
       return template ? { success: true, data: template } : { success: false, error: "Template tidak ditemukan" };
     }
-    return result;
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error || "Template tidak ditemukan" };
+    }
+    return { success: true, data: result.data };
   } catch {
     const template = mockRecurringTemplates.find(t => t.template_id === templateId);
     return template ? { success: true, data: template } : { success: false, error: "Template tidak ditemukan" };
@@ -522,10 +537,11 @@ export async function toggleRecurringTemplateStatus(
 export async function getChecklistItems(templateId: string): Promise<ApiResponse<ChecklistItem[]>> {
   try {
     const result = await callApi<ChecklistItem[]>("getChecklistItems", { template_id: templateId }, "GET");
-    if (!result.success || result.error) {
+    if (result.error === "GAS_NOT_CONFIGURED") {
       return { success: true, data: mockChecklistItems.filter(i => i.template_id === templateId) };
     }
-    return result;
+    if (!result.success) return { success: false, error: result.error || "Gagal mengambil checklist items" };
+    return { success: true, data: result.data ?? [] };
   } catch {
     return { success: true, data: mockChecklistItems.filter(i => i.template_id === templateId) };
   }
@@ -651,14 +667,15 @@ export async function getChecklistReports(
       "GET"
     );
 
-    if (!result.success || result.error) {
+    if (result.error === "GAS_NOT_CONFIGURED") {
       let reports = [...mockChecklistReports];
       if (filters?.outlet) reports = reports.filter((r) => r.outlet === filters.outlet);
       if (filters?.status) reports = reports.filter((r) => r.status === filters.status);
       return { success: true, data: reports };
     }
 
-    return result;
+    if (!result.success) return { success: false, error: result.error || "Gagal mengambil checklist reports" };
+    return { success: true, data: result.data ?? [] };
   } catch {
     return { success: true, data: mockChecklistReports };
   }
@@ -667,11 +684,14 @@ export async function getChecklistReports(
 export async function getChecklistDetail(taskId: string): Promise<ApiResponse<ChecklistReport>> {
   try {
     const result = await callApi<ChecklistReport>("getChecklistDetail", { task_id: taskId }, "GET");
-    if (!result.success || result.error) {
+    if (result.error === "GAS_NOT_CONFIGURED") {
       const report = mockChecklistReports.find((r) => r.task_id === taskId);
       return report ? { success: true, data: report } : { success: false, error: "Checklist tidak ditemukan" };
     }
-    return result;
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error || "Checklist tidak ditemukan" };
+    }
+    return { success: true, data: result.data };
   } catch {
     const report = mockChecklistReports.find((r) => r.task_id === taskId);
     return report ? { success: true, data: report } : { success: false, error: "Checklist tidak ditemukan" };
@@ -776,12 +796,17 @@ export async function getStaff(filters?: { outlet?: string; status?: string }): 
   try {
     const result = await callApi<unknown>("getStaff", filters as Record<string, string>, "GET");
 
-    // GAS not available or returned error — fallback to mock staff
-    if (!result.success || result.error) {
+    // GAS not configured → silent fallback to mock
+    if (result.error === "GAS_NOT_CONFIGURED") {
       let staff = [...mockStaff];
       if (filters?.outlet) staff = staff.filter(s => s.outlet === filters.outlet);
       if (filters?.status) staff = staff.filter(s => s.status === filters.status);
       return { success: true, data: staff };
+    }
+
+    // GAS returned a real error
+    if (!result.success && result.error) {
+      return { success: false, error: result.error };
     }
 
     if (result.success && result.data) {
@@ -792,7 +817,7 @@ export async function getStaff(filters?: { outlet?: string; status?: string }): 
       return { success: true, data: filtered };
     }
 
-    return { success: true, data: mockStaff };
+    return { success: true, data: [] };
   } catch {
     return { success: true, data: mockStaff };
   }
@@ -904,6 +929,9 @@ export async function activateStaff(staffId: string): Promise<ApiResponse<void>>
 export async function getUsers(): Promise<ApiResponse<UserLogin[]>> {
   try {
     const result = await callApi<unknown>("getUsers", {});
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      return { success: true, data: [] };
+    }
     if (result.success && result.data) {
       const raw = Array.isArray(result.data)
         ? result.data
@@ -923,22 +951,12 @@ export async function getUsers(): Promise<ApiResponse<UserLogin[]>> {
 export async function createUser(payload: CreateUserPayload): Promise<ApiResponse<UserLogin>> {
   try {
     const result = await callApi<UserLogin>("createUser", payload as unknown as Record<string, unknown>);
-    
+
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(1000);
-      const newUser: UserLogin = {
-        user_id: `USR-${String(Date.now()).slice(-6)}`,
-        staff_id: payload.staff_id,
-        username: payload.username,
-        role: payload.role,
-        login_enabled: payload.login_enabled,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      return { success: true, data: newUser };
+      return { success: false, error: "GAS belum dikonfigurasi. Hubungi administrator." };
     }
-    
-    if (result.success) return result;
+
+    if (result.success && result.data) return { success: true, data: result.data };
     return { success: false, error: result.error || "Gagal membuat user" };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Gagal membuat user" };
@@ -948,7 +966,12 @@ export async function createUser(payload: CreateUserPayload): Promise<ApiRespons
 export async function updateUser(payload: UpdateUserPayload): Promise<ApiResponse<UserLogin>> {
   try {
     const result = await callApi<UserLogin>("updateUser", payload as unknown as Record<string, unknown>);
-    if (result.success) return result;
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      return { success: false, error: "GAS belum dikonfigurasi. Hubungi administrator." };
+    }
+
+    if (result.success && result.data) return { success: true, data: result.data };
     return { success: false, error: result.error || "Gagal mengupdate user" };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Gagal mengupdate user" };
@@ -958,6 +981,11 @@ export async function updateUser(payload: UpdateUserPayload): Promise<ApiRespons
 export async function deleteUser(userId: string): Promise<ApiResponse<void>> {
   try {
     const result = await callApi<void>("deleteUser", { user_id: userId });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      return { success: false, error: "GAS belum dikonfigurasi. Hubungi administrator." };
+    }
+
     if (result.success) return { success: true };
     return { success: false, error: result.error || "Gagal menghapus user" };
   } catch (error) {
@@ -989,6 +1017,9 @@ function normalizeStringItem(
 export async function getAreas(): Promise<ApiResponse<string[]>> {
   try {
     const result = await callApi<unknown>("getAreas", {});
+
+    if (result.error === "GAS_NOT_CONFIGURED") return { success: true, data: mockAreas };
+    if (!result.success && result.error) return { success: false, error: result.error };
 
     if (result.success && result.data) {
       const raw = Array.isArray(result.data)
@@ -1046,6 +1077,9 @@ export async function deleteArea(name: string): Promise<ApiResponse<void>> {
 export async function getCategories(): Promise<ApiResponse<string[]>> {
   try {
     const result = await callApi<unknown>("getCategories", {});
+
+    if (result.error === "GAS_NOT_CONFIGURED") return { success: true, data: mockCategories };
+    if (!result.success && result.error) return { success: false, error: result.error };
 
     if (result.success && result.data) {
       const raw = Array.isArray(result.data)
