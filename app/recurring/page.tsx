@@ -325,14 +325,16 @@ export default function RecurringPage() {
                     <Select
                       value={formData.pic_name}
                       onValueChange={handleStaffSelect}
+                      disabled={isLoading || staffList.length === 0}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih PIC" />
+                        <SelectValue placeholder={staffList.length === 0 ? "Memuat staff..." : "Pilih PIC"} />
                       </SelectTrigger>
                       <SelectContent>
                         {filteredStaff.map((s) => (
-                          <SelectItem key={s.staff_id} value={s.name}>{s.name}</SelectItem>
+                          <SelectItem key={s.staff_id} value={s.name}>{s.name} ({s.wa_number})</SelectItem>
                         ))}
+                        {filteredStaff.length === 0 && <div className="p-2 text-sm text-muted-foreground">Tidak ada staff untuk outlet ini</div>}
                       </SelectContent>
                     </Select>
                   </div>

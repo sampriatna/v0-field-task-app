@@ -115,12 +115,14 @@ export default function UsersPage() {
 
   const handleStaffSelect = (staffId: string) => {
     const staff = staffList.find((s) => s.staff_id === staffId);
-    setFormData((prev) => ({
-      ...prev,
-      staff_id: staffId,
-      username: staff ? staff.wa_number.replace(/\D/g, "") : prev.username,
-      role: staff ? staff.role : prev.role,
-    }));
+    if (staff) {
+      const username = staff.wa_number.replace(/\D/g, "");
+      setFormData({
+        ...formData,
+        staff_id: staff.staff_id,
+        username: username,
+      });
+    }
   };
 
   const handleSubmit = async () => {

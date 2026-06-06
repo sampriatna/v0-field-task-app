@@ -609,12 +609,13 @@ export default function RecurringTasksSettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label>PIC</Label>
-                <Select value={formData.pic_name} onValueChange={handleStaffSelect}>
-                  <SelectTrigger><SelectValue placeholder="Pilih PIC" /></SelectTrigger>
+                <Select value={formData.pic_name} onValueChange={handleStaffSelect} disabled={isLoading || staffList.length === 0}>
+                  <SelectTrigger><SelectValue placeholder={staffList.length === 0 ? "Memuat staff..." : "Pilih PIC"} /></SelectTrigger>
                   <SelectContent>
                     {(filteredStaff.length > 0 ? filteredStaff : staffList).map((s) => (
-                      <SelectItem key={s.staff_id} value={s.name}>{s.name}</SelectItem>
+                      <SelectItem key={s.staff_id} value={s.name}>{s.name} ({s.wa_number})</SelectItem>
                     ))}
+                    {staffList.length === 0 && <div className="p-2 text-sm text-muted-foreground">Tidak ada staff tersedia</div>}
                   </SelectContent>
                 </Select>
               </div>
