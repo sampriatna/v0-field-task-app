@@ -150,7 +150,11 @@ export default function UsersPage() {
           login_enabled: formData.login_enabled,
         };
         const result = await createUser(payload);
-        if (!result.success) throw new Error(result.error);
+        if (!result.success) {
+          console.log("[v0] createUser error:", result.error);
+          throw new Error(result.error);
+        }
+        setUsers([...users, result.data as UserLogin]);
         toast({ title: "Berhasil", description: "User login berhasil dibuat" });
       } else {
         if (!editingUser) return;
@@ -162,7 +166,11 @@ export default function UsersPage() {
         };
         if (formData.password.trim()) payload.password = formData.password;
         const result = await updateUser(payload);
-        if (!result.success) throw new Error(result.error);
+        if (!result.success) {
+          console.log("[v0] updateUser error:", result.error);
+          throw new Error(result.error);
+        }
+        setUsers(users.map((u) => (u.user_id === editingUser.user_id ? result.data as UserLogin : u)));
         toast({ title: "Berhasil", description: "User berhasil diupdate" });
       }
       loadData();

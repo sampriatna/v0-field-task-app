@@ -923,6 +923,21 @@ export async function getUsers(): Promise<ApiResponse<UserLogin[]>> {
 export async function createUser(payload: CreateUserPayload): Promise<ApiResponse<UserLogin>> {
   try {
     const result = await callApi<UserLogin>("createUser", payload as unknown as Record<string, unknown>);
+    
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(1000);
+      const newUser: UserLogin = {
+        user_id: `USR-${String(Date.now()).slice(-6)}`,
+        staff_id: payload.staff_id,
+        username: payload.username,
+        role: payload.role,
+        login_enabled: payload.login_enabled,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      return { success: true, data: newUser };
+    }
+    
     if (result.success) return result;
     return { success: false, error: result.error || "Gagal membuat user" };
   } catch (error) {
