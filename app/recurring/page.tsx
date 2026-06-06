@@ -326,7 +326,7 @@ export default function RecurringPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {filteredStaff.map((s) => (
-                          <SelectItem key={s.wa} value={s.name}>{s.name}</SelectItem>
+                          <SelectItem key={s.staff_id} value={s.name}>{s.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
