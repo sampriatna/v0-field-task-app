@@ -266,7 +266,7 @@ export default function DashboardPage() {
             </TabsTrigger>
             <TabsTrigger value="checklists" className="flex items-center gap-2">
               <ListChecks className="w-4 h-4" />
-              Checklist ({checklistTasks.length})
+              Checklist ({checklists.length})
             </TabsTrigger>
           </TabsList>
 
