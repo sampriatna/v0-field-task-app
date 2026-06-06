@@ -42,24 +42,27 @@ import {
   createRecurringTemplate,
   updateRecurringTemplate,
   toggleRecurringTemplateStatus,
+  getStaff,
+  getAreas,
+  getCategories,
 } from "@/lib/api";
 import type {
   RecurringTemplate,
   CreateRecurringTemplatePayload,
+  Staff,
   Outlet,
   Area,
   Category,
   RepeatType,
   DayOfWeek,
 } from "@/lib/types";
-import { outlets, areas, categories, staffList, daysOfWeek } from "@/lib/mock-data";
+import { outlets, daysOfWeek } from "@/lib/mock-data";
 
-const repeatTypeOptions: { value: RepeatType; label: string }[] = [
-  { value: "daily", label: "Harian (Setiap Hari)" },
-  { value: "weekdays", label: "Hari Kerja (Senin-Jumat)" },
-  { value: "weekends", label: "Akhir Pekan (Sabtu-Minggu)" },
-  { value: "weekly", label: "Pilih Hari Tertentu" },
-  { value: "monthly", label: "Bulanan (Pilih Tanggal)" },
+const repeatTypeOptions: { value: RepeatType; label: string; description?: string }[] = [
+  { value: "daily", label: "Setiap Hari", description: "Tugas dijalankan setiap hari" },
+  { value: "weekdays", label: "Hari Kerja (Senin-Jumat)", description: "Setiap hari Senin sampai Jumat" },
+  { value: "weekly", label: "Mingguan", description: "Pilih hari-hari tertentu dalam seminggu" },
+  { value: "monthly", label: "Setiap Bulan", description: "Dijalankan satu kali setiap bulan" },
 ];
 
 const initialFormState: CreateRecurringTemplatePayload = {
@@ -81,6 +84,9 @@ const initialFormState: CreateRecurringTemplatePayload = {
 export default function RecurringPage() {
   const { toast } = useToast();
   const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [areaList, setAreaList] = useState<string[]>([]);
+  const [categoryList, setCategoryList] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,7 +95,15 @@ export default function RecurringPage() {
 
   useEffect(() => {
     loadTemplates();
+    loadStaff();
+    loadMasterData();
   }, []);
+
+  const loadMasterData = async () => {
+    const [areasResult, categoriesResult] = await Promise.all([getAreas(), getCategories()]);
+    if (areasResult.success && areasResult.data) setAreaList(areasResult.data);
+    if (categoriesResult.success && categoriesResult.data) setCategoryList(categoriesResult.data);
+  };
 
   const loadTemplates = async () => {
     setIsLoading(true);
@@ -135,14 +149,19 @@ export default function RecurringPage() {
     setIsSubmitting(true);
 
     try {
+      const payload = {
+        ...formData,
+        repeat_type: formData.repeat_type.toUpperCase(),
+      };
+
       let result;
       if (editingTemplate) {
         result = await updateRecurringTemplate({
-          ...formData,
+          ...payload,
           template_id: editingTemplate.template_id,
         });
       } else {
-        result = await createRecurringTemplate(formData);
+        result = await createRecurringTemplate(payload);
       }
 
       if (result.success) {
@@ -194,6 +213,8 @@ export default function RecurringPage() {
     let newDays: DayOfWeek[] = [];
     if (value === "daily") {
       newDays = ["senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu"];
+    } else if (value === "weekdays") {
+      newDays = ["senin", "selasa", "rabu", "kamis", "jumat"];
     } else if (value === "weekly") {
       newDays = ["senin"];
     }
@@ -214,7 +235,7 @@ export default function RecurringPage() {
   const handleStaffSelect = (name: string) => {
     const staff = staffList.find((s) => s.name === name);
     if (staff) {
-      setFormData({ ...formData, pic_name: staff.name, pic_wa: staff.wa });
+      setFormData({ ...formData, pic_name: staff.name, pic_wa: staff.wa_number });
     }
   };
 
@@ -309,7 +330,7 @@ export default function RecurringPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {areas.map((a) => (
+                        {areaList.map((a) => (
                           <SelectItem key={a} value={a}>{a}</SelectItem>
                         ))}
                       </SelectContent>
@@ -328,7 +349,7 @@ export default function RecurringPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((c) => (
+                        {categoryList.map((c) => (
                           <SelectItem key={c} value={c}>{c}</SelectItem>
                         ))}
                       </SelectContent>
@@ -339,14 +360,16 @@ export default function RecurringPage() {
                     <Select
                       value={formData.pic_name}
                       onValueChange={handleStaffSelect}
+                      disabled={isLoading || staffList.length === 0}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih PIC" />
+                        <SelectValue placeholder={staffList.length === 0 ? "Memuat staff..." : "Pilih PIC"} />
                       </SelectTrigger>
                       <SelectContent>
                         {filteredStaff.map((s) => (
-                          <SelectItem key={s.wa} value={s.name}>{s.name}</SelectItem>
+                          <SelectItem key={s.staff_id} value={s.name}>{s.name} ({s.wa_number})</SelectItem>
                         ))}
+                        {filteredStaff.length === 0 && <div className="p-2 text-sm text-muted-foreground">Tidak ada staff untuk outlet ini</div>}
                       </SelectContent>
                     </Select>
                   </div>
@@ -391,7 +414,7 @@ export default function RecurringPage() {
                   </Select>
                 </div>
 
-                {(formData.repeat_type === "weekly" || formData.repeat_type === "custom") && (
+                {formData.repeat_type === "weekly" && (
                   <div className="space-y-2">
                     <Label>Pilih Hari</Label>
                     <div className="flex flex-wrap gap-2">

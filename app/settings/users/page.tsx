@@ -115,12 +115,14 @@ export default function UsersPage() {
 
   const handleStaffSelect = (staffId: string) => {
     const staff = staffList.find((s) => s.staff_id === staffId);
-    setFormData((prev) => ({
-      ...prev,
-      staff_id: staffId,
-      username: staff ? staff.wa_number.replace(/\D/g, "") : prev.username,
-      role: staff ? staff.role : prev.role,
-    }));
+    if (staff) {
+      const username = staff.wa_number.replace(/\D/g, "");
+      setFormData({
+        ...formData,
+        staff_id: staff.staff_id,
+        username: username,
+      });
+    }
   };
 
   const handleSubmit = async () => {
@@ -148,7 +150,11 @@ export default function UsersPage() {
           login_enabled: formData.login_enabled,
         };
         const result = await createUser(payload);
-        if (!result.success) throw new Error(result.error);
+        if (!result.success) {
+          console.log("[v0] createUser error:", result.error);
+          throw new Error(result.error);
+        }
+        setUsers([...users, result.data as UserLogin]);
         toast({ title: "Berhasil", description: "User login berhasil dibuat" });
       } else {
         if (!editingUser) return;
@@ -160,7 +166,11 @@ export default function UsersPage() {
         };
         if (formData.password.trim()) payload.password = formData.password;
         const result = await updateUser(payload);
-        if (!result.success) throw new Error(result.error);
+        if (!result.success) {
+          console.log("[v0] updateUser error:", result.error);
+          throw new Error(result.error);
+        }
+        setUsers(users.map((u) => (u.user_id === editingUser.user_id ? result.data as UserLogin : u)));
         toast({ title: "Berhasil", description: "User berhasil diupdate" });
       }
       loadData();

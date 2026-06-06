@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Plus, Trash2, AlertCircle } from "lucide-react";
-import { createArea, getAreas } from "@/lib/api";
+import { createArea, deleteArea } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface MasterAreaFormProps {
@@ -16,37 +16,41 @@ interface MasterAreaFormProps {
 export function MasterAreaForm({ areas, onAreasUpdated }: MasterAreaFormProps) {
   const [newArea, setNewArea] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [deletingArea, setDeletingArea] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleAddArea = async () => {
     if (!newArea.trim()) {
-      toast({
-        title: "Area diperlukan",
-        description: "Masukkan nama area",
-        variant: "destructive",
-      });
+      toast({ title: "Area diperlukan", description: "Masukkan nama area", variant: "destructive" });
       return;
     }
-
     setIsLoading(true);
     try {
       const result = await createArea(newArea.trim());
       if (result.success) {
-        toast({
-          title: "Area ditambahkan",
-          description: `${newArea} berhasil ditambahkan`,
-        });
+        toast({ title: "Area ditambahkan", description: `${newArea} berhasil ditambahkan` });
         setNewArea("");
         onAreasUpdated();
       } else {
-        toast({
-          title: "Gagal menambah area",
-          description: result.error,
-          variant: "destructive",
-        });
+        toast({ title: "Gagal menambah area", description: result.error, variant: "destructive" });
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeleteArea = async (name: string) => {
+    setDeletingArea(name);
+    try {
+      const result = await deleteArea(name);
+      if (result.success) {
+        toast({ title: "Area dihapus", description: `${name} berhasil dihapus` });
+        onAreasUpdated();
+      } else {
+        toast({ title: "Gagal menghapus area", description: result.error, variant: "destructive" });
+      }
+    } finally {
+      setDeletingArea(null);
     }
   };
 
@@ -101,7 +105,8 @@ export function MasterAreaForm({ areas, onAreasUpdated }: MasterAreaFormProps) {
                   variant="ghost"
                   size="sm"
                   className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  disabled={isLoading}
+                  disabled={isLoading || deletingArea === label}
+                  onClick={() => handleDeleteArea(label)}
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>

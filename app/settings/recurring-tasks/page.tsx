@@ -76,10 +76,11 @@ interface ChecklistItemForm {
   active_status: boolean;
 }
 
-const repeatTypeOptions: { value: RepeatType; label: string }[] = [
-  { value: "daily", label: "Setiap Hari" },
-  { value: "weekly", label: "Mingguan" },
-  { value: "custom", label: "Pilih Hari" },
+const repeatTypeOptions: { value: RepeatType; label: string; description?: string }[] = [
+  { value: "daily", label: "Setiap Hari", description: "Tugas dijalankan setiap hari" },
+  { value: "weekdays", label: "Hari Kerja (Senin-Jumat)", description: "Setiap hari Senin sampai Jumat" },
+  { value: "weekly", label: "Mingguan", description: "Pilih hari-hari tertentu dalam seminggu" },
+  { value: "monthly", label: "Setiap Bulan", description: "Dijalankan satu kali setiap bulan" },
 ];
 
 const initialFormState: CreateRecurringTemplatePayload = {
@@ -149,7 +150,7 @@ export default function RecurringTasksSettingsPage() {
         pic_wa: template.pic_wa,
         task_title: template.task_title,
         task_description: template.task_description,
-        repeat_type: template.repeat_type,
+        repeat_type: template.repeat_type.toLowerCase(),
         repeat_days: template.repeat_days,
         repeat_time: template.repeat_time,
         deadline_time: template.deadline_time,
@@ -170,9 +171,14 @@ export default function RecurringTasksSettingsPage() {
     }
     setIsSubmitting(true);
     try {
+      const payload = {
+        ...formData,
+        repeat_type: formData.repeat_type.toUpperCase(),
+      };
+
       const result = editingTemplate
-        ? await updateRecurringTemplate({ ...formData, template_id: editingTemplate.template_id })
-        : await createRecurringTemplate(formData);
+        ? await updateRecurringTemplate({ ...payload, template_id: editingTemplate.template_id })
+        : await createRecurringTemplate(payload);
 
       if (result.success) {
         toast({ title: editingTemplate ? "Template Diperbarui" : "Template Dibuat" });
@@ -201,12 +207,16 @@ export default function RecurringTasksSettingsPage() {
   };
 
   const handleRepeatTypeChange = (value: RepeatType) => {
-    const newDays: DayOfWeek[] =
-      value === "daily"
-        ? ["senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu"]
-        : value === "weekly"
-        ? ["senin"]
-        : [];
+    let newDays: DayOfWeek[];
+    if (value === "daily") {
+      newDays = ["senin", "selasa", "rabu", "kamis", "jumat", "sabtu", "minggu"];
+    } else if (value === "weekdays") {
+      newDays = ["senin", "selasa", "rabu", "kamis", "jumat"];
+    } else if (value === "weekly") {
+      newDays = ["senin"];
+    } else {
+      newDays = [];
+    }
     setFormData({ ...formData, repeat_type: value, repeat_days: newDays });
   };
 
@@ -604,12 +614,13 @@ export default function RecurringTasksSettingsPage() {
               </div>
               <div className="space-y-2">
                 <Label>PIC</Label>
-                <Select value={formData.pic_name} onValueChange={handleStaffSelect}>
-                  <SelectTrigger><SelectValue placeholder="Pilih PIC" /></SelectTrigger>
+                <Select value={formData.pic_name} onValueChange={handleStaffSelect} disabled={isLoading || staffList.length === 0}>
+                  <SelectTrigger><SelectValue placeholder={staffList.length === 0 ? "Memuat staff..." : "Pilih PIC"} /></SelectTrigger>
                   <SelectContent>
                     {(filteredStaff.length > 0 ? filteredStaff : staffList).map((s) => (
-                      <SelectItem key={s.staff_id} value={s.name}>{s.name}</SelectItem>
+                      <SelectItem key={s.staff_id} value={s.name}>{s.name} ({s.wa_number})</SelectItem>
                     ))}
+                    {staffList.length === 0 && <div className="p-2 text-sm text-muted-foreground">Tidak ada staff tersedia</div>}
                   </SelectContent>
                 </Select>
               </div>
@@ -647,7 +658,7 @@ export default function RecurringTasksSettingsPage() {
               </Select>
             </div>
 
-            {(formData.repeat_type === "weekly" || formData.repeat_type === "custom") && (
+            {formData.repeat_type === "weekly" && (
               <div className="space-y-2">
                 <Label>Pilih Hari</Label>
                 <div className="flex flex-wrap gap-2">
