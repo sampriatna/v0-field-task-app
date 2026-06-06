@@ -115,7 +115,7 @@ export default function RecurringPage() {
         pic_wa: template.pic_wa,
         task_title: template.task_title,
         task_description: template.task_description,
-        repeat_type: template.repeat_type,
+        repeat_type: template.repeat_type.toLowerCase(),
         repeat_days: template.repeat_days,
         repeat_time: template.repeat_time,
         deadline_time: template.deadline_time,
@@ -133,14 +133,19 @@ export default function RecurringPage() {
     setIsSubmitting(true);
 
     try {
+      const payload = {
+        ...formData,
+        repeat_type: formData.repeat_type.toUpperCase(),
+      };
+
       let result;
       if (editingTemplate) {
         result = await updateRecurringTemplate({
-          ...formData,
+          ...payload,
           template_id: editingTemplate.template_id,
         });
       } else {
-        result = await createRecurringTemplate(formData);
+        result = await createRecurringTemplate(payload);
       }
 
       if (result.success) {
