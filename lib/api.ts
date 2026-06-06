@@ -1016,12 +1016,30 @@ export async function getAreas(): Promise<ApiResponse<string[]>> {
 export async function createArea(name: string): Promise<ApiResponse<string>> {
   try {
     const result = await callApi<Record<string, unknown>>("createArea", { name });
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      return { success: true, data: name };
+    }
     if (result.success) {
       return { success: true, data: (result.data?.area || result.data?.data || name) as string };
     }
     return { success: false, error: result.error || "Gagal menambah area" };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Gagal menambah area" };
+  }
+}
+
+export async function deleteArea(name: string): Promise<ApiResponse<void>> {
+  try {
+    const result = await callApi<void>("deleteArea", { name });
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(300);
+      return { success: true };
+    }
+    if (result.success) return { success: true };
+    return { success: false, error: result.error || "Gagal menghapus area" };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Gagal menghapus area" };
   }
 }
 
@@ -1055,11 +1073,29 @@ export async function getCategories(): Promise<ApiResponse<string[]>> {
 export async function createCategory(name: string): Promise<ApiResponse<string>> {
   try {
     const result = await callApi<Record<string, unknown>>("createCategory", { name });
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(500);
+      return { success: true, data: name };
+    }
     if (result.success) {
       return { success: true, data: (result.data?.category || result.data?.data || name) as string };
     }
     return { success: false, error: result.error || "Gagal menambah kategori" };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Gagal menambah kategori" };
+  }
+}
+
+export async function deleteCategory(name: string): Promise<ApiResponse<void>> {
+  try {
+    const result = await callApi<void>("deleteCategory", { name });
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      await delay(300);
+      return { success: true };
+    }
+    if (result.success) return { success: true };
+    return { success: false, error: result.error || "Gagal menghapus kategori" };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Gagal menghapus kategori" };
   }
 }

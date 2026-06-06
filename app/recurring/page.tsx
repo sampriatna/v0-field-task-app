@@ -42,18 +42,21 @@ import {
   createRecurringTemplate,
   updateRecurringTemplate,
   toggleRecurringTemplateStatus,
+  getStaff,
+  getAreas,
+  getCategories,
 } from "@/lib/api";
 import type {
   RecurringTemplate,
   CreateRecurringTemplatePayload,
+  Staff,
   Outlet,
   Area,
   Category,
   RepeatType,
   DayOfWeek,
 } from "@/lib/types";
-import { outlets, areas, categories, staffList, daysOfWeek } from "@/lib/mock-data";
-
+import { outlets, daysOfWeek } from "@/lib/mock-data";
 const repeatTypeOptions: { value: RepeatType; label: string; description?: string }[] = [
   { value: "daily", label: "Setiap Hari", description: "Tugas dijalankan setiap hari" },
   { value: "weekdays", label: "Hari Kerja (Senin-Jumat)", description: "Setiap hari Senin sampai Jumat" },
@@ -80,6 +83,9 @@ const initialFormState: CreateRecurringTemplatePayload = {
 export default function RecurringPage() {
   const { toast } = useToast();
   const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
+  const [staffList, setStaffList] = useState<Staff[]>([]);
+  const [areaList, setAreaList] = useState<string[]>([]);
+  const [categoryList, setCategoryList] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,7 +95,14 @@ export default function RecurringPage() {
   useEffect(() => {
     loadTemplates();
     loadStaff();
+    loadMasterData();
   }, []);
+
+  const loadMasterData = async () => {
+    const [areasResult, categoriesResult] = await Promise.all([getAreas(), getCategories()]);
+    if (areasResult.success && areasResult.data) setAreaList(areasResult.data);
+    if (categoriesResult.success && categoriesResult.data) setCategoryList(categoriesResult.data);
+  };
 
   const loadTemplates = async () => {
     setIsLoading(true);
@@ -299,7 +312,7 @@ export default function RecurringPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {areas.map((a) => (
+                        {areaList.map((a) => (
                           <SelectItem key={a} value={a}>{a}</SelectItem>
                         ))}
                       </SelectContent>
@@ -318,7 +331,7 @@ export default function RecurringPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {categories.map((c) => (
+                        {categoryList.map((c) => (
                           <SelectItem key={c} value={c}>{c}</SelectItem>
                         ))}
                       </SelectContent>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Plus, Trash2, AlertCircle } from "lucide-react";
-import { createCategory } from "@/lib/api";
+import { createCategory, deleteCategory } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface MasterCategoryFormProps {
@@ -19,37 +19,41 @@ export function MasterCategoryForm({
 }: MasterCategoryFormProps) {
   const [newCategory, setNewCategory] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleAddCategory = async () => {
     if (!newCategory.trim()) {
-      toast({
-        title: "Kategori diperlukan",
-        description: "Masukkan nama kategori",
-        variant: "destructive",
-      });
+      toast({ title: "Kategori diperlukan", description: "Masukkan nama kategori", variant: "destructive" });
       return;
     }
-
     setIsLoading(true);
     try {
       const result = await createCategory(newCategory.trim());
       if (result.success) {
-        toast({
-          title: "Kategori ditambahkan",
-          description: `${newCategory} berhasil ditambahkan`,
-        });
+        toast({ title: "Kategori ditambahkan", description: `${newCategory} berhasil ditambahkan` });
         setNewCategory("");
         onCategoriesUpdated();
       } else {
-        toast({
-          title: "Gagal menambah kategori",
-          description: result.error,
-          variant: "destructive",
-        });
+        toast({ title: "Gagal menambah kategori", description: result.error, variant: "destructive" });
       }
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (name: string) => {
+    setDeletingCategory(name);
+    try {
+      const result = await deleteCategory(name);
+      if (result.success) {
+        toast({ title: "Kategori dihapus", description: `${name} berhasil dihapus` });
+        onCategoriesUpdated();
+      } else {
+        toast({ title: "Gagal menghapus kategori", description: result.error, variant: "destructive" });
+      }
+    } finally {
+      setDeletingCategory(null);
     }
   };
 
@@ -104,7 +108,8 @@ export function MasterCategoryForm({
                   variant="ghost"
                   size="sm"
                   className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  disabled={isLoading}
+                  disabled={isLoading || deletingCategory === label}
+                  onClick={() => handleDeleteCategory(label)}
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
