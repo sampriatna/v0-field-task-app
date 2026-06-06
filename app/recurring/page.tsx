@@ -88,6 +88,7 @@ export default function RecurringPage() {
 
   useEffect(() => {
     loadTemplates();
+    loadStaff();
   }, []);
 
   const loadTemplates = async () => {
@@ -220,7 +221,7 @@ export default function RecurringPage() {
   const handleStaffSelect = (name: string) => {
     const staff = staffList.find((s) => s.name === name);
     if (staff) {
-      setFormData({ ...formData, pic_name: staff.name, pic_wa: staff.wa });
+      setFormData({ ...formData, pic_name: staff.name, pic_wa: staff.wa_number });
     }
   };
 
