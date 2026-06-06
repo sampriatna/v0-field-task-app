@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
   // Calculate checklist summary from tasks with checklist_mode === "YES"
   const calculateChecklistSummary = (taskList: Task[]): ChecklistSummary => {
-    const checklistTasks = taskList.filter(t => t.checklist_mode === "YES");
+    const checklistTasks = taskList.filter(t => t.checklist_mode === "YES" || t.task_id?.startsWith("CHK-TSK-"));
     
     const openStatuses = ["CREATED", "SENT", "WA_FAILED", "OPEN", "OPENED"];
     const submittedStatuses = ["SUBMITTED", "RESUBMITTED", "WAITING_VERIFICATION"];
@@ -142,7 +142,7 @@ export default function DashboardPage() {
 
   // Filter tasks: manual tasks (non-checklist) and checklist tasks
   const manualTasks = tasks.filter(t => t.checklist_mode !== "YES");
-  const checklistTasks = tasks.filter(t => t.checklist_mode === "YES");
+  const checklistTasks = tasks.filter(t => t.checklist_mode === "YES" || t.task_id?.startsWith("CHK-TSK-"));
 
   const filteredTasks = manualTasks.filter((task) => {
     if (searchQuery) {
