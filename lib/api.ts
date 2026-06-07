@@ -152,6 +152,38 @@ function normalizeCheckedItems(data: unknown): ChecklistReportItem[] {
   return rawList.map(normalizeCheckedItem);
 }
 
+// Normalize a single checklist template item from GAS (field names vary)
+function normalizeChecklistItem(raw: Record<string, unknown>, index: number): ChecklistItem {
+  // active_status defaults to TRUE unless GAS explicitly says otherwise
+  const activeRaw = pickField(raw, ["active_status", "activeStatus", "active", "is_active", "isActive"]);
+  const activeStatus = activeRaw === undefined ? true : coerceChecked(activeRaw);
+
+  return {
+    checklist_item_id: String(
+      pickField(raw, ["checklist_item_id", "checklistItemId", "item_id", "itemId", "id"]) || `ITEM-${index + 1}`
+    ),
+    template_id: String(pickField(raw, ["template_id", "templateId"]) || ""),
+    item_order: Number(pickField(raw, ["item_order", "itemOrder", "order", "no", "urutan"]) ?? index + 1),
+    item_text: String(
+      pickField(raw, ["item_text", "itemText", "text", "title", "name", "description", "item"]) || ""
+    ),
+    requires_photo: coerceChecked(
+      pickField(raw, ["requires_photo", "requiresPhoto", "require_photo", "need_photo", "photo_required", "wajib_foto"])
+    ),
+    is_required: (() => {
+      const r = pickField(raw, ["is_required", "isRequired", "required", "wajib", "mandatory"]);
+      return r === undefined ? true : coerceChecked(r);
+    })(),
+    active_status: activeStatus,
+  };
+}
+
+// Extract and normalize the template items array from various GAS shapes
+function normalizeChecklistItems(data: unknown): ChecklistItem[] {
+  if (!Array.isArray(data)) return [];
+  return (data as Record<string, unknown>[]).map((item, i) => normalizeChecklistItem(item, i));
+}
+
 // Normalize a full checklist report from GAS, mapping varying field names
 function normalizeChecklistReport(data: unknown): ChecklistReport | null {
   if (!data || typeof data !== "object") return null;
@@ -165,9 +197,9 @@ function normalizeChecklistReport(data: unknown): ChecklistReport | null {
     root
   ) as Record<string, unknown>;
 
-  // Normalize the template items list (reuse task normalizer shape)
-  const itemsRaw = pickField(obj, ["items", "checklist_items", "checklistItems", "template_items"]);
-  const items = Array.isArray(itemsRaw) ? (itemsRaw as ChecklistItem[]) : [];
+  // Normalize the template items list (field names vary across GAS sheets)
+  const itemsRaw = pickField(obj, ["items", "checklist_items", "checklistItems", "template_items", "templateItems"]);
+  const items = normalizeChecklistItems(itemsRaw);
 
   // checked_items may live under several keys, or be merged into items
   const checkedItems = normalizeCheckedItems(
@@ -706,7 +738,24 @@ export async function getChecklistByToken(
       return { success: false, error: "Link checklist tidak valid" };
     }
 
-    return result;
+    if (!result.success) {
+      return { success: false, error: result.error || "Link checklist tidak valid" };
+    }
+
+    if (!result.data) {
+      return { success: false, error: "Link checklist tidak valid atau sudah kedaluwarsa" };
+    }
+
+    // GAS field names vary — normalize so items, photos, status map correctly
+    const normalized = normalizeChecklistReport(result.data);
+    if (!normalized || normalized.items.length === 0) {
+      return {
+        success: false,
+        error: "Checklist ditemukan tetapi tidak punya item. Periksa data di GAS (sheet item checklist).",
+      };
+    }
+
+    return { success: true, data: normalized };
   } catch (error) {
     return {
       success: false,
