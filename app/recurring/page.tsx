@@ -98,7 +98,11 @@ export default function RecurringPage() {
     loadStaff();
     loadMasterData();
   }, []);
-
+  const loadStaff = async () => {
+        const result = await getStaff();
+        if (result.success && result.data) setStaffList(result.data);
+  };
+  
   const loadMasterData = async () => {
     const [areasResult, categoriesResult] = await Promise.all([getAreas(), getCategories()]);
     if (areasResult.success && areasResult.data) setAreaList(areasResult.data);
