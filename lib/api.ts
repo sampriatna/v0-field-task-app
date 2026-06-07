@@ -102,6 +102,110 @@ function staffPayloadToGAS(payload: CreateStaffPayload | UpdateStaffPayload): Re
   return gasPayload;
 }
 
+// Pick the first non-empty value from a list of possible field names
+function pickField(obj: Record<string, unknown>, keys: string[]): unknown {
+  for (const key of keys) {
+    const v = obj[key];
+    if (v !== undefined && v !== null && v !== "") return v;
+  }
+  return undefined;
+}
+
+// Coerce various truthy representations from GAS into a boolean
+function coerceChecked(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const v = value.trim().toUpperCase();
+    return v === "TRUE" || v === "1" || v === "YES" || v === "Y" || v === "CHECKED" || v === "DONE" || v === "✓";
+  }
+  return false;
+}
+
+// Normalize a single checked item from GAS (field names vary)
+function normalizeCheckedItem(raw: Record<string, unknown>): ChecklistReportItem {
+  const photo = pickField(raw, ["photo_url", "photoUrl", "photo", "image_url", "imageUrl", "photo_link", "url"]);
+  return {
+    checklist_item_id: String(
+      pickField(raw, ["checklist_item_id", "checklistItemId", "item_id", "itemId", "id"]) || ""
+    ),
+    is_checked: coerceChecked(
+      pickField(raw, ["is_checked", "isChecked", "checked", "is_done", "done", "status", "value"])
+    ),
+    photo_url: photo ? String(photo) : undefined,
+  };
+}
+
+// Extract the checked items array from various GAS response shapes
+function normalizeCheckedItems(data: unknown): ChecklistReportItem[] {
+  if (!data) return [];
+  let rawList: Record<string, unknown>[] = [];
+  if (Array.isArray(data)) {
+    rawList = data as Record<string, unknown>[];
+  } else if (typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.checked_items)) rawList = obj.checked_items as Record<string, unknown>[];
+    else if (Array.isArray(obj.checkedItems)) rawList = obj.checkedItems as Record<string, unknown>[];
+    else if (Array.isArray(obj.items)) rawList = obj.items as Record<string, unknown>[];
+    else if (Array.isArray(obj.report_items)) rawList = obj.report_items as Record<string, unknown>[];
+  }
+  return rawList.map(normalizeCheckedItem);
+}
+
+// Normalize a full checklist report from GAS, mapping varying field names
+function normalizeChecklistReport(data: unknown): ChecklistReport | null {
+  if (!data || typeof data !== "object") return null;
+
+  // Unwrap common envelope keys
+  const root = data as Record<string, unknown>;
+  const obj = (
+    (root.report && typeof root.report === "object" && root.report) ||
+    (root.checklist && typeof root.checklist === "object" && root.checklist) ||
+    (root.data && typeof root.data === "object" && !Array.isArray(root.data) && root.data) ||
+    root
+  ) as Record<string, unknown>;
+
+  // Normalize the template items list (reuse task normalizer shape)
+  const itemsRaw = pickField(obj, ["items", "checklist_items", "checklistItems", "template_items"]);
+  const items = Array.isArray(itemsRaw) ? (itemsRaw as ChecklistItem[]) : [];
+
+  // checked_items may live under several keys, or be merged into items
+  const checkedItems = normalizeCheckedItems(
+    pickField(obj, ["checked_items", "checkedItems", "report_items", "reportItems", "results"]) ?? obj
+  );
+
+  const afterPhoto = pickField(obj, [
+    "after_photo_url", "afterPhotoUrl", "after_photo", "afterPhoto", "result_photo_url", "final_photo_url",
+  ]);
+
+  return {
+    report_id: String(pickField(obj, ["report_id", "reportId", "id"]) || ""),
+    task_id: String(pickField(obj, ["task_id", "taskId"]) || ""),
+    template_id: String(pickField(obj, ["template_id", "templateId"]) || ""),
+    token: String(pickField(obj, ["token"]) || ""),
+    pic_name: String(pickField(obj, ["pic_name", "picName", "staff_name", "pic"]) || ""),
+    pic_wa: String(pickField(obj, ["pic_wa", "picWa", "wa_number", "wa"]) || ""),
+    outlet: (pickField(obj, ["outlet"]) || "") as ChecklistReport["outlet"],
+    area: (pickField(obj, ["area"]) || "") as ChecklistReport["area"],
+    report_date: String(pickField(obj, ["report_date", "reportDate", "date"]) || ""),
+    deadline: String(pickField(obj, ["deadline", "due_date", "dueDate"]) || ""),
+    checklist_title: String(
+      pickField(obj, ["checklist_title", "checklistTitle", "title", "template_name", "task_name"]) || ""
+    ),
+    items,
+    submitted_at: pickField(obj, ["submitted_at", "submittedAt"]) ? String(pickField(obj, ["submitted_at", "submittedAt"])) : undefined,
+    checked_items: checkedItems,
+    after_photo_url: afterPhoto ? String(afterPhoto) : undefined,
+    staff_note: pickField(obj, ["staff_note", "staffNote", "note"]) ? String(pickField(obj, ["staff_note", "staffNote", "note"])) : undefined,
+    status: (pickField(obj, ["status"]) || "OPEN") as ChecklistReport["status"],
+    verified_by: pickField(obj, ["verified_by", "verifiedBy"]) ? String(pickField(obj, ["verified_by", "verifiedBy"])) : undefined,
+    verified_at: pickField(obj, ["verified_at", "verifiedAt"]) ? String(pickField(obj, ["verified_at", "verifiedAt"])) : undefined,
+    revision_note: pickField(obj, ["revision_note", "revisionNote"]) ? String(pickField(obj, ["revision_note", "revisionNote"])) : undefined,
+    revision_count: Number(pickField(obj, ["revision_count", "revisionCount"]) || 0),
+    is_late: coerceChecked(pickField(obj, ["is_late", "isLate", "late"])),
+  };
+}
+
 // Build the correct staff report link for the frontend route /report/[taskId]?token=
 export function buildReportLink(taskId: string, token: string, origin?: string): string {
   const base =
@@ -691,7 +795,12 @@ export async function getChecklistDetail(taskId: string): Promise<ApiResponse<Ch
     if (!result.success || !result.data) {
       return { success: false, error: result.error || "Checklist tidak ditemukan" };
     }
-    return { success: true, data: result.data };
+    // GAS field names vary — normalize so checked_items, photos, etc. map correctly
+    const normalized = normalizeChecklistReport(result.data);
+    if (!normalized) {
+      return { success: false, error: "Format data checklist tidak valid" };
+    }
+    return { success: true, data: normalized };
   } catch {
     const report = mockChecklistReports.find((r) => r.task_id === taskId);
     return report ? { success: true, data: report } : { success: false, error: "Checklist tidak ditemukan" };
