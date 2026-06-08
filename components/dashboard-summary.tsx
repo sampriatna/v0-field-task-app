@@ -98,25 +98,39 @@ export function DashboardSummaryCards({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       {cards.map((card) => (
-        <Card
+        <div
           key={card.key}
-          onClick={() => card.key !== "total" && onStatusClick?.(card.key as string)}
+          onClick={() => {
+            if (card.key !== "total") {
+              onStatusClick?.(card.key as string);
+            }
+          }}
           className={cn(
-            "p-3 border cursor-pointer transition-all hover:shadow-md",
-            card.className,
+            "cursor-pointer transition-all hover:shadow-md rounded-lg",
             card.key !== "total" && "hover:border-slate-400"
           )}
+          role="button"
+          tabIndex={card.key !== "total" ? 0 : -1}
+          onKeyDown={(e) => {
+            if (card.key !== "total" && (e.key === "Enter" || e.key === " ")) {
+              onStatusClick?.(card.key as string);
+            }
+          }}
         >
-          <div className="flex items-center gap-2 mb-1">
-            <span className={card.textClass}>{card.icon}</span>
-            <span className={cn("text-xs font-medium", card.textClass)}>
-              {card.label}
-            </span>
-          </div>
-          <p className={cn("text-2xl font-bold", card.textClass)}>
-            {summary[card.key]}
-          </p>
-        </Card>
+          <Card
+            className={cn("p-3 border", card.className)}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className={card.textClass}>{card.icon}</span>
+              <span className={cn("text-xs font-medium", card.textClass)}>
+                {card.label}
+              </span>
+            </div>
+            <p className={cn("text-2xl font-bold", card.textClass)}>
+              {summary[card.key]}
+            </p>
+          </Card>
+        </div>
       ))}
     </div>
   );
@@ -197,25 +211,39 @@ export function ChecklistSummaryCards({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       {checklistCards.map((card) => (
-        <Card
+        <div
           key={card.key}
-          onClick={() => card.key !== "total" && onStatusClick?.(card.key as string)}
+          onClick={() => {
+            if (card.key !== "total") {
+              onStatusClick?.(card.key as string);
+            }
+          }}
           className={cn(
-            "p-3 border cursor-pointer transition-all hover:shadow-md",
-            card.className,
+            "cursor-pointer transition-all hover:shadow-md rounded-lg",
             card.key !== "total" && "hover:border-slate-400"
           )}
+          role="button"
+          tabIndex={card.key !== "total" ? 0 : -1}
+          onKeyDown={(e) => {
+            if (card.key !== "total" && (e.key === "Enter" || e.key === " ")) {
+              onStatusClick?.(card.key as string);
+            }
+          }}
         >
-          <div className="flex items-center gap-2 mb-1">
-            <span className={card.textClass}>{card.icon}</span>
-            <span className={cn("text-xs font-medium", card.textClass)}>
-              {card.label}
-            </span>
-          </div>
-          <p className={cn("text-2xl font-bold", card.textClass)}>
-            {summary[card.key]}
-          </p>
-        </Card>
+          <Card
+            className={cn("p-3 border", card.className)}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className={card.textClass}>{card.icon}</span>
+              <span className={cn("text-xs font-medium", card.textClass)}>
+                {card.label}
+              </span>
+            </div>
+            <p className={cn("text-2xl font-bold", card.textClass)}>
+              {summary[card.key]}
+            </p>
+          </Card>
+        </div>
       ))}
     </div>
   );
