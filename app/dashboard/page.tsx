@@ -25,12 +25,39 @@ import { useToast } from "@/hooks/use-toast";
 
 const statusOptions: { value: TaskStatus | "ALL"; label: string }[] = [
   { value: "ALL", label: "Semua Status" },
-  { value: "OPEN", label: "Open" },
-  { value: "SUBMITTED", label: "Submitted" },
-  { value: "DONE", label: "Done" },
-  { value: "LATE", label: "Late" },
-  { value: "REVISI", label: "Revisi" },
+  { value: "OPEN", label: "Belum Dikerjakan" },
+  { value: "SUBMITTED", label: "Terkirim" },
+  { value: "DONE", label: "Selesai" },
+  { value: "LATE", label: "Terlambat" },
+  { value: "REVISI", label: "Perlu Revisi" },
 ];
+
+// Helper function to check if task matches the filtered status
+// Uses same grouping logic as calculateTaskSummary
+function matchesStatusFilter(task: Task, selectedStatus: TaskStatus | "ALL"): boolean {
+  if (selectedStatus === "ALL") return true;
+
+  const openStatuses = ["CREATED", "SENT", "WA_FAILED", "OPEN", "OPENED"];
+  const submittedStatuses = ["SUBMITTED", "RESUBMITTED", "WAITING_VERIFICATION"];
+  const doneStatuses = ["DONE", "VERIFIED"];
+  const revisiStatuses = ["REVISI", "REVISION", "REVISION_REQUESTED"];
+  const lateStatuses = ["LATE"];
+
+  switch (selectedStatus) {
+    case "OPEN":
+      return openStatuses.includes(task.status) && !(task.is_late === true || task.is_late === "YES" || task.status === "LATE");
+    case "SUBMITTED":
+      return submittedStatuses.includes(task.status);
+    case "DONE":
+      return doneStatuses.includes(task.status);
+    case "LATE":
+      return task.status === "LATE" || task.is_late === true || task.is_late === "YES";
+    case "REVISI":
+      return revisiStatuses.includes(task.status);
+    default:
+      return true;
+  }
+}
 
 export default function DashboardPage() {
   const { toast } = useToast();
@@ -155,7 +182,7 @@ export default function DashboardPage() {
         if (!matchesSearch) return false;
       }
       if (selectedOutlet !== "ALL" && task.outlet !== selectedOutlet) return false;
-      if (selectedStatus !== "ALL" && task.status !== selectedStatus) return false;
+      if (!matchesStatusFilter(task, selectedStatus)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -176,7 +203,7 @@ export default function DashboardPage() {
         if (!matchesSearch) return false;
       }
       if (selectedOutlet !== "ALL" && checklist.outlet !== selectedOutlet) return false;
-      if (selectedStatus !== "ALL" && checklist.status !== selectedStatus) return false;
+      if (!matchesStatusFilter(checklist as unknown as Task, selectedStatus)) return false;
       return true;
     })
     .sort((a, b) => {
@@ -286,7 +313,11 @@ export default function DashboardPage() {
 
           <TabsContent value="tasks" className="space-y-4 mt-4">
             {/* Task Summary Cards */}
-            <DashboardSummaryCards summary={summary} isLoading={isLoading} />
+            <DashboardSummaryCards 
+              summary={summary} 
+              isLoading={isLoading}
+              onStatusClick={(status) => setSelectedStatus(status as TaskStatus | "ALL")}
+            />
 
             {/* Search and Filter Bar */}
             <div className="flex items-center gap-2">
@@ -416,7 +447,11 @@ export default function DashboardPage() {
 
           <TabsContent value="checklists" className="space-y-4 mt-4">
             {/* Checklist Summary Cards */}
-            <ChecklistSummaryCards summary={checklistSummary} isLoading={isLoading} />
+            <ChecklistSummaryCards 
+              summary={checklistSummary} 
+              isLoading={isLoading}
+              onStatusClick={(status) => setSelectedStatus(status as TaskStatus | "ALL")}
+            />
 
             {/* Search and Filter Bar */}
             <div className="flex items-center gap-2">
