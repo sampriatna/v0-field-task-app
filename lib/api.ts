@@ -245,6 +245,28 @@ export function buildReportLink(taskId: string, token: string, origin?: string):
   return `${base}/report/${taskId}?token=${token}`;
 }
 
+// Robust datetime parser handles GAS formats like "2026-06-08T10:00:00" (no timezone)
+export function parseDateTime(dateStr: unknown): Date {
+  if (!dateStr) return new Date();
+  
+  const str = String(dateStr).trim();
+  if (!str) return new Date();
+
+  // Try parsing as-is first
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) return parsed;
+
+  // GAS sometimes sends "2026-06-08T10:00:00" without timezone — add Z to force UTC
+  if (str.includes("T") && !str.includes("Z") && !str.includes("+") && !str.includes("-", 10)) {
+    const withZ = str + "Z";
+    const parsed2 = new Date(withZ);
+    if (!isNaN(parsed2.getTime())) return parsed2;
+  }
+
+  // Fallback to current time if all parsing fails
+  return new Date();
+}
+
 async function callApi<T>(
   action: string,
   payload?: Record<string, unknown>,
