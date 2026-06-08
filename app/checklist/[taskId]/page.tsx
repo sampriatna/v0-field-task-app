@@ -18,7 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { getChecklistByToken, submitChecklistReport, parseDateTime } from "@/lib/api";
+import { getChecklistByToken, submitChecklistReport } from "@/lib/api";
 import type { ChecklistReport, ChecklistReportItem } from "@/lib/types";
 
 type PageState = "loading" | "ready" | "submitting" | "success" | "error";
@@ -114,7 +114,7 @@ export default function StaffChecklistPage({
   const getDeadlineInfo = () => {
     if (!checklist) return { text: "", isLate: false, urgent: false };
     
-    const deadline = parseDateTime(checklist.deadline);
+    const deadline = new Date(checklist.deadline);
     const now = new Date();
     const diff = deadline.getTime() - now.getTime();
     const isLate = diff < 0;

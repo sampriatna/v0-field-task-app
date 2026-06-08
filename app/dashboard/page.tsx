@@ -144,33 +144,47 @@ export default function DashboardPage() {
   const manualTasks = tasks.filter(t => t.checklist_mode !== "YES");
   const checklistTasks = tasks.filter(t => t.checklist_mode === "YES" || t.task_id?.startsWith("CHK-TSK-"));
 
-  const filteredTasks = manualTasks.filter((task) => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        task.task_title.toLowerCase().includes(query) ||
-        task.task_id.toLowerCase().includes(query) ||
-        task.pic_name.toLowerCase().includes(query);
-      if (!matchesSearch) return false;
-    }
-    if (selectedOutlet !== "ALL" && task.outlet !== selectedOutlet) return false;
-    if (selectedStatus !== "ALL" && task.status !== selectedStatus) return false;
-    return true;
-  });
+  const filteredTasks = manualTasks
+    .filter((task) => {
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch =
+          task.task_title.toLowerCase().includes(query) ||
+          task.task_id.toLowerCase().includes(query) ||
+          task.pic_name.toLowerCase().includes(query);
+        if (!matchesSearch) return false;
+      }
+      if (selectedOutlet !== "ALL" && task.outlet !== selectedOutlet) return false;
+      if (selectedStatus !== "ALL" && task.status !== selectedStatus) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // Sort by deadline: oldest to newest
+      const deadlineA = new Date(a.deadline).getTime();
+      const deadlineB = new Date(b.deadline).getTime();
+      return deadlineA - deadlineB;
+    });
 
-  const filteredChecklists = checklistTasks.filter((checklist) => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        (checklist.checklist_title || checklist.task_title || '').toLowerCase().includes(query) ||
-        checklist.task_id.toLowerCase().includes(query) ||
-        checklist.pic_name.toLowerCase().includes(query);
-      if (!matchesSearch) return false;
-    }
-    if (selectedOutlet !== "ALL" && checklist.outlet !== selectedOutlet) return false;
-    if (selectedStatus !== "ALL" && checklist.status !== selectedStatus) return false;
-    return true;
-  });
+  const filteredChecklists = checklistTasks
+    .filter((checklist) => {
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch =
+          (checklist.checklist_title || checklist.task_title || '').toLowerCase().includes(query) ||
+          checklist.task_id.toLowerCase().includes(query) ||
+          checklist.pic_name.toLowerCase().includes(query);
+        if (!matchesSearch) return false;
+      }
+      if (selectedOutlet !== "ALL" && checklist.outlet !== selectedOutlet) return false;
+      if (selectedStatus !== "ALL" && checklist.status !== selectedStatus) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      // Sort by deadline: oldest to newest
+      const deadlineA = new Date(a.deadline).getTime();
+      const deadlineB = new Date(b.deadline).getTime();
+      return deadlineA - deadlineB;
+    });
 
   const hasActiveFilters = selectedOutlet !== "ALL" || selectedStatus !== "ALL" || searchQuery !== "";
 
