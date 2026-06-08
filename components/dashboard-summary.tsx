@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 interface DashboardSummaryCardsProps {
   summary: DashboardSummary;
   isLoading?: boolean;
+  onStatusClick?: (status: string) => void;
 }
 
 interface SummaryCard {
@@ -74,6 +75,7 @@ const cards: SummaryCard[] = [
 export function DashboardSummaryCards({
   summary,
   isLoading = false,
+  onStatusClick,
 }: DashboardSummaryCardsProps) {
   if (isLoading) {
     return (
@@ -96,20 +98,39 @@ export function DashboardSummaryCards({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       {cards.map((card) => (
-        <Card
+        <div
           key={card.key}
-          className={cn("p-3 border", card.className)}
+          onClick={() => {
+            if (card.key !== "total") {
+              onStatusClick?.(card.key as string);
+            }
+          }}
+          className={cn(
+            "cursor-pointer transition-all hover:shadow-md rounded-lg",
+            card.key !== "total" && "hover:border-slate-400"
+          )}
+          role="button"
+          tabIndex={card.key !== "total" ? 0 : -1}
+          onKeyDown={(e) => {
+            if (card.key !== "total" && (e.key === "Enter" || e.key === " ")) {
+              onStatusClick?.(card.key as string);
+            }
+          }}
         >
-          <div className="flex items-center gap-2 mb-1">
-            <span className={card.textClass}>{card.icon}</span>
-            <span className={cn("text-xs font-medium", card.textClass)}>
-              {card.label}
-            </span>
-          </div>
-          <p className={cn("text-2xl font-bold", card.textClass)}>
-            {summary[card.key]}
-          </p>
-        </Card>
+          <Card
+            className={cn("p-3 border", card.className)}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className={card.textClass}>{card.icon}</span>
+              <span className={cn("text-xs font-medium", card.textClass)}>
+                {card.label}
+              </span>
+            </div>
+            <p className={cn("text-2xl font-bold", card.textClass)}>
+              {summary[card.key]}
+            </p>
+          </Card>
+        </div>
       ))}
     </div>
   );
@@ -119,6 +140,7 @@ export function DashboardSummaryCards({
 interface ChecklistSummaryCardsProps {
   summary: ChecklistSummary;
   isLoading?: boolean;
+  onStatusClick?: (status: string) => void;
 }
 
 const checklistCards: SummaryCard[] = [
@@ -169,6 +191,7 @@ const checklistCards: SummaryCard[] = [
 export function ChecklistSummaryCards({
   summary,
   isLoading = false,
+  onStatusClick,
 }: ChecklistSummaryCardsProps) {
   if (isLoading) {
     return (
@@ -188,17 +211,39 @@ export function ChecklistSummaryCards({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       {checklistCards.map((card) => (
-        <Card key={card.key} className={cn("p-3 border", card.className)}>
-          <div className="flex items-center gap-2 mb-1">
-            <span className={card.textClass}>{card.icon}</span>
-            <span className={cn("text-xs font-medium", card.textClass)}>
-              {card.label}
-            </span>
-          </div>
-          <p className={cn("text-2xl font-bold", card.textClass)}>
-            {summary[card.key]}
-          </p>
-        </Card>
+        <div
+          key={card.key}
+          onClick={() => {
+            if (card.key !== "total") {
+              onStatusClick?.(card.key as string);
+            }
+          }}
+          className={cn(
+            "cursor-pointer transition-all hover:shadow-md rounded-lg",
+            card.key !== "total" && "hover:border-slate-400"
+          )}
+          role="button"
+          tabIndex={card.key !== "total" ? 0 : -1}
+          onKeyDown={(e) => {
+            if (card.key !== "total" && (e.key === "Enter" || e.key === " ")) {
+              onStatusClick?.(card.key as string);
+            }
+          }}
+        >
+          <Card
+            className={cn("p-3 border", card.className)}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className={card.textClass}>{card.icon}</span>
+              <span className={cn("text-xs font-medium", card.textClass)}>
+                {card.label}
+              </span>
+            </div>
+            <p className={cn("text-2xl font-bold", card.textClass)}>
+              {summary[card.key]}
+            </p>
+          </Card>
+        </div>
       ))}
     </div>
   );

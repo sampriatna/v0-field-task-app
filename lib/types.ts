@@ -121,7 +121,7 @@ export interface User {
 }
 
 // Recurring Task Types
-export type RepeatType = "daily" | "weekly" | "custom";
+export type RepeatType = "daily" | "weekdays" | "weekly" | "monthly" | "custom";
 
 export type DayOfWeek = "senin" | "selasa" | "rabu" | "kamis" | "jumat" | "sabtu" | "minggu";
 
@@ -298,6 +298,7 @@ export interface UserLogin {
   wa_number?: string;
   login_enabled: boolean;
   created_at?: string;
+  updated_at?: string;
   last_login?: string;
 }
 

@@ -24,7 +24,7 @@ const statusConfig: Record<
     className: "bg-red-100 text-red-800 border-red-200",
   },
   OPEN: {
-    label: "Open",
+    label: "Belum Dikerjakan",
     className: "bg-blue-100 text-blue-800 border-blue-200",
   },
   OPENED: {
@@ -32,7 +32,7 @@ const statusConfig: Record<
     className: "bg-indigo-100 text-indigo-800 border-indigo-200",
   },
   SUBMITTED: {
-    label: "Submitted",
+    label: "Terkirim",
     className: "bg-amber-100 text-amber-800 border-amber-200",
   },
   RESUBMITTED: {
@@ -44,19 +44,19 @@ const statusConfig: Record<
     className: "bg-yellow-100 text-yellow-800 border-yellow-200",
   },
   DONE: {
-    label: "Done",
-    className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    label: "Selesai",
+    className: "bg-green-100 text-green-800 border-green-200",
   },
   VERIFIED: {
-    label: "Verified",
-    className: "bg-emerald-100 text-emerald-800 border-emerald-200",
+    label: "Terverifikasi",
+    className: "bg-green-100 text-green-800 border-green-200",
   },
   REVISI: {
-    label: "Revisi",
+    label: "Perlu Revisi",
     className: "bg-orange-100 text-orange-800 border-orange-200",
   },
   REVISION: {
-    label: "Revisi",
+    label: "Perlu Revisi",
     className: "bg-orange-100 text-orange-800 border-orange-200",
   },
   REVISION_REQUESTED: {
@@ -64,8 +64,20 @@ const statusConfig: Record<
     className: "bg-orange-100 text-orange-800 border-orange-200",
   },
   LATE: {
-    label: "Late",
+    label: "Terlambat",
     className: "bg-red-100 text-red-800 border-red-200",
+  },
+  WA_SENT: {
+    label: "WA Terkirim",
+    className: "bg-sky-100 text-sky-800 border-sky-200",
+  },
+  PENDING: {
+    label: "Belum Dikerjakan",
+    className: "bg-gray-100 text-gray-700 border-gray-200",
+  },
+  COMPLETED: {
+    label: "Selesai",
+    className: "bg-green-100 text-green-800 border-green-200",
   },
 };
 

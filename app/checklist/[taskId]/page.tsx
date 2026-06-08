@@ -51,7 +51,7 @@ export default function StaffChecklistPage({
         setChecklist(result.data);
         // Initialize checked items
         const initial: Record<string, boolean> = {};
-        result.data.items.forEach((item) => {
+        (result.data.items || []).forEach((item) => {
           initial[item.checklist_item_id] = false;
         });
         setCheckedItems(initial);

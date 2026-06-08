@@ -102,6 +102,142 @@ function staffPayloadToGAS(payload: CreateStaffPayload | UpdateStaffPayload): Re
   return gasPayload;
 }
 
+// Pick the first non-empty value from a list of possible field names
+function pickField(obj: Record<string, unknown>, keys: string[]): unknown {
+  for (const key of keys) {
+    const v = obj[key];
+    if (v !== undefined && v !== null && v !== "") return v;
+  }
+  return undefined;
+}
+
+// Coerce various truthy representations from GAS into a boolean
+function coerceChecked(value: unknown): boolean {
+  if (value === true) return true;
+  if (typeof value === "number") return value === 1;
+  if (typeof value === "string") {
+    const v = value.trim().toUpperCase();
+    return v === "TRUE" || v === "1" || v === "YES" || v === "Y" || v === "CHECKED" || v === "DONE" || v === "✓";
+  }
+  return false;
+}
+
+// Normalize a single checked item from GAS (field names vary)
+function normalizeCheckedItem(raw: Record<string, unknown>): ChecklistReportItem {
+  const photo = pickField(raw, ["photo_url", "photoUrl", "photo", "image_url", "imageUrl", "photo_link", "url"]);
+  return {
+    checklist_item_id: String(
+      pickField(raw, ["checklist_item_id", "checklistItemId", "item_id", "itemId", "id"]) || ""
+    ),
+    is_checked: coerceChecked(
+      pickField(raw, ["is_checked", "isChecked", "checked", "is_done", "done", "status", "value"])
+    ),
+    photo_url: photo ? String(photo) : undefined,
+  };
+}
+
+// Extract the checked items array from various GAS response shapes
+function normalizeCheckedItems(data: unknown): ChecklistReportItem[] {
+  if (!data) return [];
+  let rawList: Record<string, unknown>[] = [];
+  if (Array.isArray(data)) {
+    rawList = data as Record<string, unknown>[];
+  } else if (typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    if (Array.isArray(obj.checked_items)) rawList = obj.checked_items as Record<string, unknown>[];
+    else if (Array.isArray(obj.checkedItems)) rawList = obj.checkedItems as Record<string, unknown>[];
+    else if (Array.isArray(obj.items)) rawList = obj.items as Record<string, unknown>[];
+    else if (Array.isArray(obj.report_items)) rawList = obj.report_items as Record<string, unknown>[];
+  }
+  return rawList.map(normalizeCheckedItem);
+}
+
+// Normalize a single checklist template item from GAS (field names vary)
+function normalizeChecklistItem(raw: Record<string, unknown>, index: number): ChecklistItem {
+  // active_status defaults to TRUE unless GAS explicitly says otherwise
+  const activeRaw = pickField(raw, ["active_status", "activeStatus", "active", "is_active", "isActive"]);
+  const activeStatus = activeRaw === undefined ? true : coerceChecked(activeRaw);
+
+  return {
+    checklist_item_id: String(
+      pickField(raw, ["checklist_item_id", "checklistItemId", "item_id", "itemId", "id"]) || `ITEM-${index + 1}`
+    ),
+    template_id: String(pickField(raw, ["template_id", "templateId"]) || ""),
+    item_order: Number(pickField(raw, ["item_order", "itemOrder", "order", "no", "urutan"]) ?? index + 1),
+    item_text: String(
+      pickField(raw, ["item_text", "itemText", "text", "title", "name", "description", "item"]) || ""
+    ),
+    requires_photo: coerceChecked(
+      pickField(raw, ["requires_photo", "requiresPhoto", "require_photo", "need_photo", "photo_required", "wajib_foto"])
+    ),
+    is_required: (() => {
+      const r = pickField(raw, ["is_required", "isRequired", "required", "wajib", "mandatory"]);
+      return r === undefined ? true : coerceChecked(r);
+    })(),
+    active_status: activeStatus,
+  };
+}
+
+// Extract and normalize the template items array from various GAS shapes
+function normalizeChecklistItems(data: unknown): ChecklistItem[] {
+  if (!Array.isArray(data)) return [];
+  return (data as Record<string, unknown>[]).map((item, i) => normalizeChecklistItem(item, i));
+}
+
+// Normalize a full checklist report from GAS, mapping varying field names
+function normalizeChecklistReport(data: unknown): ChecklistReport | null {
+  if (!data || typeof data !== "object") return null;
+
+  // Unwrap common envelope keys
+  const root = data as Record<string, unknown>;
+  const obj = (
+    (root.report && typeof root.report === "object" && root.report) ||
+    (root.checklist && typeof root.checklist === "object" && root.checklist) ||
+    (root.data && typeof root.data === "object" && !Array.isArray(root.data) && root.data) ||
+    root
+  ) as Record<string, unknown>;
+
+  // Normalize the template items list (field names vary across GAS sheets)
+  const itemsRaw = pickField(obj, ["items", "checklist_items", "checklistItems", "template_items", "templateItems"]);
+  const items = normalizeChecklistItems(itemsRaw);
+
+  // checked_items may live under several keys, or be merged into items
+  const checkedItems = normalizeCheckedItems(
+    pickField(obj, ["checked_items", "checkedItems", "report_items", "reportItems", "results"]) ?? obj
+  );
+
+  const afterPhoto = pickField(obj, [
+    "after_photo_url", "afterPhotoUrl", "after_photo", "afterPhoto", "result_photo_url", "final_photo_url",
+  ]);
+
+  return {
+    report_id: String(pickField(obj, ["report_id", "reportId", "id"]) || ""),
+    task_id: String(pickField(obj, ["task_id", "taskId"]) || ""),
+    template_id: String(pickField(obj, ["template_id", "templateId"]) || ""),
+    token: String(pickField(obj, ["token"]) || ""),
+    pic_name: String(pickField(obj, ["pic_name", "picName", "staff_name", "pic"]) || ""),
+    pic_wa: String(pickField(obj, ["pic_wa", "picWa", "wa_number", "wa"]) || ""),
+    outlet: (pickField(obj, ["outlet"]) || "") as ChecklistReport["outlet"],
+    area: (pickField(obj, ["area"]) || "") as ChecklistReport["area"],
+    report_date: String(pickField(obj, ["report_date", "reportDate", "date"]) || ""),
+    deadline: String(pickField(obj, ["deadline", "due_date", "dueDate"]) || ""),
+    checklist_title: String(
+      pickField(obj, ["checklist_title", "checklistTitle", "title", "template_name", "task_name"]) || ""
+    ),
+    items,
+    submitted_at: pickField(obj, ["submitted_at", "submittedAt"]) ? String(pickField(obj, ["submitted_at", "submittedAt"])) : undefined,
+    checked_items: checkedItems,
+    after_photo_url: afterPhoto ? String(afterPhoto) : undefined,
+    staff_note: pickField(obj, ["staff_note", "staffNote", "note"]) ? String(pickField(obj, ["staff_note", "staffNote", "note"])) : undefined,
+    status: (pickField(obj, ["status"]) || "OPEN") as ChecklistReport["status"],
+    verified_by: pickField(obj, ["verified_by", "verifiedBy"]) ? String(pickField(obj, ["verified_by", "verifiedBy"])) : undefined,
+    verified_at: pickField(obj, ["verified_at", "verifiedAt"]) ? String(pickField(obj, ["verified_at", "verifiedAt"])) : undefined,
+    revision_note: pickField(obj, ["revision_note", "revisionNote"]) ? String(pickField(obj, ["revision_note", "revisionNote"])) : undefined,
+    revision_count: Number(pickField(obj, ["revision_count", "revisionCount"]) || 0),
+    is_late: coerceChecked(pickField(obj, ["is_late", "isLate", "late"])),
+  };
+}
+
 // Build the correct staff report link for the frontend route /report/[taskId]?token=
 export function buildReportLink(taskId: string, token: string, origin?: string): string {
   const base =
@@ -289,8 +425,8 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
       "GET"
     );
 
-    // GAS not configured OR GAS returned any error (e.g. UNKNOWN_ACTION) → use mock
-    if (!result.success || result.error) {
+    // GAS not configured → show mock data so app still works without GAS
+    if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(300);
       let tasks = [...mockTasks];
       if (filters?.outlet) tasks = tasks.filter((t) => t.outlet === filters.outlet);
@@ -301,14 +437,24 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
       return { success: true, data: tasks };
     }
 
+    // GAS returned a real error (not network) — surface it to the UI
+    if (!result.success && result.error) {
+      return { success: false, error: result.error };
+    }
+
     if (result.success && result.data !== undefined) {
       const list = normalizeTaskList(result.data);
       return { success: true, data: list };
     }
 
-    return { success: true, data: mockTasks };
+    return { success: true, data: [] };
   } catch {
-    return { success: true, data: mockTasks };
+    // Network failure — fallback to mock
+    await delay(300);
+    let tasks = [...mockTasks];
+    if (filters?.outlet) tasks = tasks.filter((t) => t.outlet === filters.outlet);
+    if (filters?.status) tasks = tasks.filter((t) => t.status === filters.status);
+    return { success: true, data: tasks };
   }
 }
 
@@ -408,8 +554,10 @@ export async function resendWhatsApp(taskId: string): Promise<ApiResponse<void>>
 export async function getRecurringTemplates(): Promise<ApiResponse<RecurringTemplate[]>> {
   try {
     const result = await callApi<RecurringTemplate[]>("getRecurringTemplates", undefined, "GET");
-    if (!result.success || result.error) return { success: true, data: mockRecurringTemplates };
-    return result;
+    // Only fall back to mock when GAS is not configured at all
+    if (result.error === "GAS_NOT_CONFIGURED") return { success: true, data: mockRecurringTemplates };
+    if (!result.success) return { success: false, error: result.error || "Gagal mengambil template" };
+    return { success: true, data: result.data ?? [] };
   } catch {
     return { success: true, data: mockRecurringTemplates };
   }
@@ -418,11 +566,14 @@ export async function getRecurringTemplates(): Promise<ApiResponse<RecurringTemp
 export async function getRecurringTemplate(templateId: string): Promise<ApiResponse<RecurringTemplate>> {
   try {
     const result = await callApi<RecurringTemplate>("getRecurringTemplate", { template_id: templateId }, "GET");
-    if (!result.success || result.error) {
+    if (result.error === "GAS_NOT_CONFIGURED") {
       const template = mockRecurringTemplates.find(t => t.template_id === templateId);
       return template ? { success: true, data: template } : { success: false, error: "Template tidak ditemukan" };
     }
-    return result;
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error || "Template tidak ditemukan" };
+    }
+    return { success: true, data: result.data };
   } catch {
     const template = mockRecurringTemplates.find(t => t.template_id === templateId);
     return template ? { success: true, data: template } : { success: false, error: "Template tidak ditemukan" };
@@ -522,10 +673,11 @@ export async function toggleRecurringTemplateStatus(
 export async function getChecklistItems(templateId: string): Promise<ApiResponse<ChecklistItem[]>> {
   try {
     const result = await callApi<ChecklistItem[]>("getChecklistItems", { template_id: templateId }, "GET");
-    if (!result.success || result.error) {
+    if (result.error === "GAS_NOT_CONFIGURED") {
       return { success: true, data: mockChecklistItems.filter(i => i.template_id === templateId) };
     }
-    return result;
+    if (!result.success) return { success: false, error: result.error || "Gagal mengambil checklist items" };
+    return { success: true, data: result.data ?? [] };
   } catch {
     return { success: true, data: mockChecklistItems.filter(i => i.template_id === templateId) };
   }
@@ -586,7 +738,24 @@ export async function getChecklistByToken(
       return { success: false, error: "Link checklist tidak valid" };
     }
 
-    return result;
+    if (!result.success) {
+      return { success: false, error: result.error || "Link checklist tidak valid" };
+    }
+
+    if (!result.data) {
+      return { success: false, error: "Link checklist tidak valid atau sudah kedaluwarsa" };
+    }
+
+    // GAS field names vary — normalize so items, photos, status map correctly
+    const normalized = normalizeChecklistReport(result.data);
+    if (!normalized || normalized.items.length === 0) {
+      return {
+        success: false,
+        error: "Checklist ditemukan tetapi tidak punya item. Periksa data di GAS (sheet item checklist).",
+      };
+    }
+
+    return { success: true, data: normalized };
   } catch (error) {
     return {
       success: false,
@@ -651,14 +820,15 @@ export async function getChecklistReports(
       "GET"
     );
 
-    if (!result.success || result.error) {
+    if (result.error === "GAS_NOT_CONFIGURED") {
       let reports = [...mockChecklistReports];
       if (filters?.outlet) reports = reports.filter((r) => r.outlet === filters.outlet);
       if (filters?.status) reports = reports.filter((r) => r.status === filters.status);
       return { success: true, data: reports };
     }
 
-    return result;
+    if (!result.success) return { success: false, error: result.error || "Gagal mengambil checklist reports" };
+    return { success: true, data: result.data ?? [] };
   } catch {
     return { success: true, data: mockChecklistReports };
   }
@@ -667,11 +837,19 @@ export async function getChecklistReports(
 export async function getChecklistDetail(taskId: string): Promise<ApiResponse<ChecklistReport>> {
   try {
     const result = await callApi<ChecklistReport>("getChecklistDetail", { task_id: taskId }, "GET");
-    if (!result.success || result.error) {
+    if (result.error === "GAS_NOT_CONFIGURED") {
       const report = mockChecklistReports.find((r) => r.task_id === taskId);
       return report ? { success: true, data: report } : { success: false, error: "Checklist tidak ditemukan" };
     }
-    return result;
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error || "Checklist tidak ditemukan" };
+    }
+    // GAS field names vary — normalize so checked_items, photos, etc. map correctly
+    const normalized = normalizeChecklistReport(result.data);
+    if (!normalized) {
+      return { success: false, error: "Format data checklist tidak valid" };
+    }
+    return { success: true, data: normalized };
   } catch {
     const report = mockChecklistReports.find((r) => r.task_id === taskId);
     return report ? { success: true, data: report } : { success: false, error: "Checklist tidak ditemukan" };
@@ -776,12 +954,17 @@ export async function getStaff(filters?: { outlet?: string; status?: string }): 
   try {
     const result = await callApi<unknown>("getStaff", filters as Record<string, string>, "GET");
 
-    // GAS not available or returned error — fallback to mock staff
-    if (!result.success || result.error) {
+    // GAS not configured → silent fallback to mock
+    if (result.error === "GAS_NOT_CONFIGURED") {
       let staff = [...mockStaff];
       if (filters?.outlet) staff = staff.filter(s => s.outlet === filters.outlet);
       if (filters?.status) staff = staff.filter(s => s.status === filters.status);
       return { success: true, data: staff };
+    }
+
+    // GAS returned a real error
+    if (!result.success && result.error) {
+      return { success: false, error: result.error };
     }
 
     if (result.success && result.data) {
@@ -792,7 +975,7 @@ export async function getStaff(filters?: { outlet?: string; status?: string }): 
       return { success: true, data: filtered };
     }
 
-    return { success: true, data: mockStaff };
+    return { success: true, data: [] };
   } catch {
     return { success: true, data: mockStaff };
   }
@@ -904,6 +1087,9 @@ export async function activateStaff(staffId: string): Promise<ApiResponse<void>>
 export async function getUsers(): Promise<ApiResponse<UserLogin[]>> {
   try {
     const result = await callApi<unknown>("getUsers", {});
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      return { success: true, data: [] };
+    }
     if (result.success && result.data) {
       const raw = Array.isArray(result.data)
         ? result.data
@@ -923,22 +1109,12 @@ export async function getUsers(): Promise<ApiResponse<UserLogin[]>> {
 export async function createUser(payload: CreateUserPayload): Promise<ApiResponse<UserLogin>> {
   try {
     const result = await callApi<UserLogin>("createUser", payload as unknown as Record<string, unknown>);
-    
+
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(1000);
-      const newUser: UserLogin = {
-        user_id: `USR-${String(Date.now()).slice(-6)}`,
-        staff_id: payload.staff_id,
-        username: payload.username,
-        role: payload.role,
-        login_enabled: payload.login_enabled,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      return { success: true, data: newUser };
+      return { success: false, error: "GAS belum dikonfigurasi. Hubungi administrator." };
     }
-    
-    if (result.success) return result;
+
+    if (result.success && result.data) return { success: true, data: result.data };
     return { success: false, error: result.error || "Gagal membuat user" };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Gagal membuat user" };
@@ -948,7 +1124,12 @@ export async function createUser(payload: CreateUserPayload): Promise<ApiRespons
 export async function updateUser(payload: UpdateUserPayload): Promise<ApiResponse<UserLogin>> {
   try {
     const result = await callApi<UserLogin>("updateUser", payload as unknown as Record<string, unknown>);
-    if (result.success) return result;
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      return { success: false, error: "GAS belum dikonfigurasi. Hubungi administrator." };
+    }
+
+    if (result.success && result.data) return { success: true, data: result.data };
     return { success: false, error: result.error || "Gagal mengupdate user" };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Gagal mengupdate user" };
@@ -958,6 +1139,11 @@ export async function updateUser(payload: UpdateUserPayload): Promise<ApiRespons
 export async function deleteUser(userId: string): Promise<ApiResponse<void>> {
   try {
     const result = await callApi<void>("deleteUser", { user_id: userId });
+
+    if (result.error === "GAS_NOT_CONFIGURED") {
+      return { success: false, error: "GAS belum dikonfigurasi. Hubungi administrator." };
+    }
+
     if (result.success) return { success: true };
     return { success: false, error: result.error || "Gagal menghapus user" };
   } catch (error) {
@@ -989,6 +1175,9 @@ function normalizeStringItem(
 export async function getAreas(): Promise<ApiResponse<string[]>> {
   try {
     const result = await callApi<unknown>("getAreas", {});
+
+    if (result.error === "GAS_NOT_CONFIGURED") return { success: true, data: mockAreas };
+    if (!result.success && result.error) return { success: false, error: result.error };
 
     if (result.success && result.data) {
       const raw = Array.isArray(result.data)
@@ -1046,6 +1235,9 @@ export async function deleteArea(name: string): Promise<ApiResponse<void>> {
 export async function getCategories(): Promise<ApiResponse<string[]>> {
   try {
     const result = await callApi<unknown>("getCategories", {});
+
+    if (result.error === "GAS_NOT_CONFIGURED") return { success: true, data: mockCategories };
+    if (!result.success && result.error) return { success: false, error: result.error };
 
     if (result.success && result.data) {
       const raw = Array.isArray(result.data)

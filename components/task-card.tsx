@@ -62,7 +62,7 @@ export function TaskCard({ task, className, onDelete }: TaskCardProps) {
   return (
     <Card
       className={cn(
-        "border-l-4 p-0 overflow-hidden",
+        "border-l-4 p-0 overflow-hidden cursor-pointer transition-colors hover:bg-muted/50",
         priorityColors[task.priority] || "border-l-slate-400",
         className
       )}
