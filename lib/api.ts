@@ -3,7 +3,7 @@ import type {
   CreateTaskPayload,
   SubmitReportPayload,
   TaskFilters,
-  DashboardSummary,h
+  DashboardSummary,
   ApiResponse,
   RecurringTemplate,
   CreateRecurringTemplatePayload,
