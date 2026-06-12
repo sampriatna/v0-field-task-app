@@ -59,6 +59,22 @@ function matchesStatusFilter(task: Task, selectedStatus: TaskStatus | "ALL"): bo
   }
 }
 
+// Helper function to extract date portion from deadline (YYYY-MM-DD)
+function getTaskDate(deadline: string): string {
+  const date = new Date(deadline);
+  if (isNaN(date.getTime())) return "";
+  return date.toISOString().split("T")[0];
+}
+
+// Get today's date in YYYY-MM-DD format (local timezone)
+function getTodayDate(): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function DashboardPage() {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -88,6 +104,9 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOutlet, setSelectedOutlet] = useState<Outlet | "ALL">("ALL");
   const [selectedStatus, setSelectedStatus] = useState<TaskStatus | "ALL">("ALL");
+  const [todayFilter, setTodayFilter] = useState(true); // Default: show only today's tasks
+  const [currentPage, setCurrentPage] = useState(1); // Pagination: 1-indexed
+  const itemsPerPage = 10;
 
   useEffect(() => {
     loadData();
@@ -173,6 +192,9 @@ export default function DashboardPage() {
 
   const filteredTasks = manualTasks
     .filter((task) => {
+      // Apply date filter (today only)
+      if (todayFilter && getTaskDate(task.deadline) !== getTodayDate()) return false;
+      
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matchesSearch =
@@ -194,6 +216,9 @@ export default function DashboardPage() {
 
   const filteredChecklists = checklistTasks
     .filter((checklist) => {
+      // Apply date filter (today only)
+      if (todayFilter && getTaskDate(checklist.deadline) !== getTodayDate()) return false;
+      
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matchesSearch =
@@ -213,6 +238,18 @@ export default function DashboardPage() {
       return deadlineA - deadlineB;
     });
 
+  // Pagination: calculate total pages and slice current page
+  const totalPages = Math.ceil(filteredTasks.length / itemsPerPage);
+  const paginatedTasks = filteredTasks.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedOutlet, selectedStatus, searchQuery, todayFilter]);
+
   const hasActiveFilters = selectedOutlet !== "ALL" || selectedStatus !== "ALL" || searchQuery !== "";
 
   const handleRefresh = async () => {
@@ -228,6 +265,16 @@ export default function DashboardPage() {
     setSelectedOutlet("ALL");
     setSelectedStatus("ALL");
     setSearchQuery("");
+    setTodayFilter(true); // Reset to today
+  };
+
+  const handleStatusClick = (status: TaskStatus | "ALL") => {
+    // Toggle: if same status clicked, reset to ALL; otherwise set new status
+    if (selectedStatus === status) {
+      setSelectedStatus("ALL");
+    } else {
+      setSelectedStatus(status);
+    }
   };
 
   const handleDeleteTask = (taskId: string) => {
@@ -316,7 +363,7 @@ export default function DashboardPage() {
             <DashboardSummaryCards 
               summary={summary} 
               isLoading={isLoading}
-              onStatusClick={(status) => setSelectedStatus(status as TaskStatus | "ALL")}
+              onStatusClick={handleStatusClick}
             />
 
             {/* Search and Filter Bar */}
@@ -358,6 +405,15 @@ export default function DashboardPage() {
             {/* Filter Panel */}
             {showFilters && (
               <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+                <Button
+                  variant={todayFilter ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setTodayFilter(!todayFilter)}
+                  className="text-xs"
+                >
+                  {todayFilter ? "📅 Hari Ini" : "📅 Semua Hari"}
+                </Button>
+                
                 <Select
                   value={selectedOutlet}
                   onValueChange={(v) => setSelectedOutlet(v as Outlet | "ALL")}
@@ -387,7 +443,7 @@ export default function DashboardPage() {
                   </SelectContent>
                 </Select>
 
-                {hasActiveFilters && (
+                {(hasActiveFilters || todayFilter) && (
                   <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
                     <X className="w-4 h-4 mr-1" />
                     Reset
@@ -401,9 +457,9 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-foreground">
                   Daftar Tugas
-                  {hasActiveFilters && (
+                  {filteredTasks.length > 0 && (
                     <span className="ml-2 text-sm font-normal text-muted-foreground">
-                      ({filteredTasks.length} hasil)
+                      ({paginatedTasks.length}/{filteredTasks.length})
                     </span>
                   )}
                 </h2>
@@ -422,9 +478,9 @@ export default function DashboardPage() {
                   </div>
                   <h3 className="font-medium text-foreground mb-1">Tidak ada tugas ditemukan</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {hasActiveFilters ? "Coba ubah filter pencarian Anda" : "Belum ada tugas yang dibuat"}
+                    {hasActiveFilters || todayFilter ? "Coba ubah filter pencarian Anda" : "Belum ada tugas yang dibuat"}
                   </p>
-                  {hasActiveFilters ? (
+                  {(hasActiveFilters || todayFilter) ? (
                     <Button variant="outline" onClick={clearFilters}>Reset Filter</Button>
                   ) : (
                     <Link href="/tasks/new">
@@ -436,11 +492,30 @@ export default function DashboardPage() {
                   )}
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {filteredTasks.map((task) => (
-                    <TaskCard key={task.task_id} task={task} onDelete={handleDeleteTask} />
-                  ))}
-                </div>
+                <>
+                  <div className="space-y-3">
+                    {paginatedTasks.map((task) => (
+                      <TaskCard key={task.task_id} task={task} onDelete={handleDeleteTask} />
+                    ))}
+                  </div>
+                  
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-1 mt-6 pb-4">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {page}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </TabsContent>
@@ -450,7 +525,7 @@ export default function DashboardPage() {
             <ChecklistSummaryCards 
               summary={checklistSummary} 
               isLoading={isLoading}
-              onStatusClick={(status) => setSelectedStatus(status as TaskStatus | "ALL")}
+              onStatusClick={handleStatusClick}
             />
 
             {/* Search and Filter Bar */}

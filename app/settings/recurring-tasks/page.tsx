@@ -594,9 +594,10 @@ export default function RecurringTasksSettingsPage() {
               <div className="space-y-2">
                 <Label>Area</Label>
                 <Select value={formData.area} onValueChange={(v) => setFormData({ ...formData, area: v as Area })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={areaList.length === 0 ? "Memuat area..." : "Pilih area"} /></SelectTrigger>
                   <SelectContent>
-                    {areaList.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                    {areaList.filter(a => a && a.trim()).map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                    {areaList.length === 0 && <div className="p-2 text-sm text-muted-foreground">Tidak ada area tersedia</div>}
                   </SelectContent>
                 </Select>
               </div>
@@ -606,9 +607,10 @@ export default function RecurringTasksSettingsPage() {
               <div className="space-y-2">
                 <Label>Kategori</Label>
                 <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v as Category })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={categoryList.length === 0 ? "Memuat kategori..." : "Pilih kategori"} /></SelectTrigger>
                   <SelectContent>
-                    {categoryList.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {categoryList.filter(c => c && c.trim()).map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {categoryList.length === 0 && <div className="p-2 text-sm text-muted-foreground">Tidak ada kategori tersedia</div>}
                   </SelectContent>
                 </Select>
               </div>
