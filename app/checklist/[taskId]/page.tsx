@@ -145,6 +145,47 @@ export default function StaffChecklistPage({
     };
   };
 
+  // Single source of truth: count items that require photos (excluding optional final photo)
+  const getRequiredItemPhotoCount = () => {
+    if (!checklist) return 0;
+    
+    return checklist.items.filter((item) => {
+      // Must be photo-required, active, and checked
+      if (!item.requires_photo || !item.active_status || !checkedItems[item.checklist_item_id]) {
+        return false;
+      }
+      
+      // Exclude final result photo ("Foto Hasil Akhir") which is optional
+      const itemTextLower = item.item_text?.toLowerCase() || "";
+      const isFinalPhoto = itemTextLower.includes("hasil") || 
+                          itemTextLower.includes("final") || 
+                          itemTextLower.includes("akhir");
+      
+      return !isFinalPhoto;
+    }).length;
+  };
+
+  const getUploadedItemPhotoCount = () => {
+    if (!checklist) return 0;
+    
+    return checklist.items.filter((item) => {
+      // Must be photo-required, active, and checked
+      if (!item.requires_photo || !item.active_status || !checkedItems[item.checklist_item_id]) {
+        return false;
+      }
+      
+      // Exclude final result photo which is optional
+      const itemTextLower = item.item_text?.toLowerCase() || "";
+      const isFinalPhoto = itemTextLower.includes("hasil") || 
+                          itemTextLower.includes("final") || 
+                          itemTextLower.includes("akhir");
+      if (isFinalPhoto) return false;
+      
+      // Check if photo is uploaded for this item
+      return !!itemPhotos[item.checklist_item_id];
+    }).length;
+  };
+
   const canSubmit = () => {
     if (!checklist) return false;
     
@@ -154,11 +195,11 @@ export default function StaffChecklistPage({
     if (!allRequiredChecked) return false;
 
     // Check required per-item photos are uploaded (afterPhoto is optional, not gated)
-    const photoRequiredItems = checklist.items.filter(
-      (item) => item.requires_photo && item.active_status && checkedItems[item.checklist_item_id]
-    );
-    const allItemPhotosUploaded = photoRequiredItems.every((item) => itemPhotos[item.checklist_item_id]);
-    if (!allItemPhotosUploaded) return false;
+    // Only count photos for items that are NOT the final optional photo
+    const requiredItemPhotoCount = getRequiredItemPhotoCount();
+    const uploadedItemPhotoCount = getUploadedItemPhotoCount();
+    
+    if (uploadedItemPhotoCount < requiredItemPhotoCount) return false;
 
     return true;
   };
@@ -177,33 +218,14 @@ export default function StaffChecklistPage({
       };
     }
 
-    // Check required per-item photos (only for checked items that require photos)
-    // IMPORTANT: Exclude the final result photo ("Foto Hasil Akhir") which is optional
-    // The final photo is identified as items where item_text contains "hasil" or is at the end of the list with that pattern
-    const checkedItemsWithPhotoRequired = checklist.items.filter(
-      (item) => {
-        // Skip if not photo-required or not active or not checked
-        if (!item.requires_photo || !item.active_status || !checkedItems[item.checklist_item_id]) {
-          return false;
-        }
-        
-        // Skip if this is the final result photo (optional)
-        // Identify by checking if the item text indicates it's a final/result photo
-        const itemTextLower = item.item_text?.toLowerCase() || "";
-        const isFinalPhoto = itemTextLower.includes("hasil") || 
-                            itemTextLower.includes("final") || 
-                            itemTextLower.includes("akhir");
-        
-        return !isFinalPhoto;
-      }
-    );
-    
-    const uploadedPhotoCount = checkedItemsWithPhotoRequired.filter((item) => itemPhotos[item.checklist_item_id]).length;
-    const missingItemPhotos = checkedItemsWithPhotoRequired.length - uploadedPhotoCount;
+    // Use single source of truth for required item photo counts
+    const requiredItemPhotoCount = getRequiredItemPhotoCount();
+    const uploadedItemPhotoCount = getUploadedItemPhotoCount();
+    const missingItemPhotos = requiredItemPhotoCount - uploadedItemPhotoCount;
     
     if (missingItemPhotos > 0) {
       return { 
-        buttonText: `UPLOAD FOTO DULU (${uploadedPhotoCount}/${checkedItemsWithPhotoRequired.length})`,
+        buttonText: `UPLOAD FOTO DULU (${uploadedItemPhotoCount}/${requiredItemPhotoCount})`,
         isBlocked: true,
         missingPhotos: ["item"]
       };
