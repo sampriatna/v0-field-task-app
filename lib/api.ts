@@ -746,19 +746,20 @@ export async function getChecklistByToken(
       return { success: false, error: "Link checklist tidak valid atau sudah kedaluwarsa" };
     }
 
-// Pre-process: merge task fields into root so normalizer finds deadline/outlet/items
-            if (result.data && typeof result.data === 'object') {
-                        const d = result.data as Record<string, unknown>;
-                        if (d.task && typeof d.task === 'object') {
-                                      Object.assign(d, d.task as Record<string, unknown>);
-                        }
-            }
-            // GAS field names vary — normalize so items, photos, status map correctly
+    // Pre-process: merge task fields into root so normalizer finds deadline/outlet/items
+    if (result.data && typeof result.data === 'object') {
+      const d = result.data as Record<string, unknown>;
+      if (d.task && typeof d.task === 'object') {
+        Object.assign(d, d.task as Record<string, unknown>);
+      }
+    }
+
+    // GAS field names vary — normalize so items, photos, status map correctly
     const normalized = normalizeChecklistReport(result.data);
-    if (!normalized || normalized.items.length === 0) {
+    if (!normalized) {
       return {
         success: false,
-        error: "Checklist ditemukan tetapi tidak punya item. Periksa data di GAS (sheet item checklist).",
+        error: "Link checklist tidak valid atau sudah kedaluwarsa",
       };
     }
 
