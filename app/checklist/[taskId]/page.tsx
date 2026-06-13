@@ -148,41 +148,55 @@ export default function StaffChecklistPage({
   const canSubmit = () => {
     if (!checklist) return false;
     
-    // Check required items
+    // Check required items are checked
     const requiredItems = checklist.items.filter((item) => item.is_required && item.active_status);
     const allRequiredChecked = requiredItems.every((item) => checkedItems[item.checklist_item_id]);
     if (!allRequiredChecked) return false;
 
-    // Check required photos
+    // Check required per-item photos are uploaded (afterPhoto is optional, not gated)
     const photoRequiredItems = checklist.items.filter(
       (item) => item.requires_photo && item.active_status && checkedItems[item.checklist_item_id]
     );
-    const allPhotosUploaded = photoRequiredItems.every((item) => itemPhotos[item.checklist_item_id]);
-    if (!allPhotosUploaded) return false;
+    const allItemPhotosUploaded = photoRequiredItems.every((item) => itemPhotos[item.checklist_item_id]);
+    if (!allItemPhotosUploaded) return false;
 
     return true;
   };
 
-  const getSubmitButtonText = () => {
-    if (!checklist) return "KIRIM LAPORAN";
+  const getSubmitButtonStatus = () => {
+    if (!checklist) return { buttonText: "KIRIM LAPORAN", isBlocked: false, missingPhotos: [] };
     
     const requiredItems = checklist.items.filter((item) => item.is_required && item.active_status);
     const checkedCount = requiredItems.filter((item) => checkedItems[item.checklist_item_id]).length;
     
     if (checkedCount < requiredItems.length) {
-      return `CENTANG DULU (${checkedCount}/${requiredItems.length})`;
+      return { 
+        buttonText: `CENTANG DULU (${checkedCount}/${requiredItems.length})`,
+        isBlocked: true,
+        missingPhotos: []
+      };
     }
 
+    // Check required per-item photos
     const photoRequiredItems = checklist.items.filter(
       (item) => item.requires_photo && item.active_status && checkedItems[item.checklist_item_id]
     );
-    const uploadedCount = photoRequiredItems.filter((item) => itemPhotos[item.checklist_item_id]).length;
+    const uploadedPhotoCount = photoRequiredItems.filter((item) => itemPhotos[item.checklist_item_id]).length;
+    const missingItemPhotos = photoRequiredItems.length - uploadedPhotoCount;
     
-    if (uploadedCount < photoRequiredItems.length) {
-      return `UPLOAD FOTO DULU (${uploadedCount}/${photoRequiredItems.length})`;
+    if (missingItemPhotos > 0) {
+      return { 
+        buttonText: `UPLOAD FOTO DULU (${uploadedPhotoCount}/${photoRequiredItems.length})`,
+        isBlocked: true,
+        missingPhotos: ["item"]
+      };
     }
 
-    return "KIRIM LAPORAN";
+    return { buttonText: "KIRIM LAPORAN", isBlocked: false, missingPhotos: [] };
+  };
+
+  const getSubmitButtonText = () => {
+    return getSubmitButtonStatus().buttonText;
   };
 
   const handleSubmit = async () => {
@@ -492,6 +506,40 @@ export default function StaffChecklistPage({
 
       {/* Fixed Submit Button */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg">
+        {/* Photo Requirements Breakdown */}
+        {!getSubmitButtonStatus().isBlocked && (
+          <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+            <div className="font-medium text-green-900 mb-2">Foto yang diupload:</div>
+            <div className="space-y-1 text-green-800">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                <span>Foto item wajib: lengkap</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">—</span>
+                <span>Foto hasil akhir: opsional</span>
+              </div>
+            </div>
+          </div>
+        )}
+        {getSubmitButtonStatus().isBlocked && getSubmitButtonStatus().missingPhotos.length > 0 && (
+          <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
+            <div className="font-medium text-amber-900 mb-2">Foto yang masih diperlukan:</div>
+            <div className="space-y-1 text-amber-800">
+              {getSubmitButtonStatus().missingPhotos.includes("item") && (
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <span>Foto item wajib: belum lengkap</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">—</span>
+                <span>Foto hasil akhir: opsional</span>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <Button
           onClick={handleSubmit}
           disabled={!canSubmit()}
