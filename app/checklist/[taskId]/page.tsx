@@ -177,16 +177,33 @@ export default function StaffChecklistPage({
       };
     }
 
-    // Check required per-item photos
-    const photoRequiredItems = checklist.items.filter(
-      (item) => item.requires_photo && item.active_status && checkedItems[item.checklist_item_id]
+    // Check required per-item photos (only for checked items that require photos)
+    // IMPORTANT: Exclude the final result photo ("Foto Hasil Akhir") which is optional
+    // The final photo is identified as items where item_text contains "hasil" or is at the end of the list with that pattern
+    const checkedItemsWithPhotoRequired = checklist.items.filter(
+      (item) => {
+        // Skip if not photo-required or not active or not checked
+        if (!item.requires_photo || !item.active_status || !checkedItems[item.checklist_item_id]) {
+          return false;
+        }
+        
+        // Skip if this is the final result photo (optional)
+        // Identify by checking if the item text indicates it's a final/result photo
+        const itemTextLower = item.item_text?.toLowerCase() || "";
+        const isFinalPhoto = itemTextLower.includes("hasil") || 
+                            itemTextLower.includes("final") || 
+                            itemTextLower.includes("akhir");
+        
+        return !isFinalPhoto;
+      }
     );
-    const uploadedPhotoCount = photoRequiredItems.filter((item) => itemPhotos[item.checklist_item_id]).length;
-    const missingItemPhotos = photoRequiredItems.length - uploadedPhotoCount;
+    
+    const uploadedPhotoCount = checkedItemsWithPhotoRequired.filter((item) => itemPhotos[item.checklist_item_id]).length;
+    const missingItemPhotos = checkedItemsWithPhotoRequired.length - uploadedPhotoCount;
     
     if (missingItemPhotos > 0) {
       return { 
-        buttonText: `UPLOAD FOTO DULU (${uploadedPhotoCount}/${photoRequiredItems.length})`,
+        buttonText: `UPLOAD FOTO DULU (${uploadedPhotoCount}/${checkedItemsWithPhotoRequired.length})`,
         isBlocked: true,
         missingPhotos: ["item"]
       };
