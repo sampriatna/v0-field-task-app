@@ -45,9 +45,17 @@ export default function StaffChecklistPage({
 
   const loadChecklist = useCallback(async () => {
     setPageState("loading");
+    setErrorMessage(""); // Clear previous errors
     try {
       const result = await getChecklistByToken(taskId, token);
       if (result.success && result.data) {
+        // Validate that we have items after successful fetch
+        const activeItems = (result.data.items || []).filter(item => item.active_status);
+        if (activeItems.length === 0) {
+          setErrorMessage("Checklist ditemukan tetapi tidak punya item");
+          setPageState("error");
+          return;
+        }
         setChecklist(result.data);
         // Initialize checked items
         const initial: Record<string, boolean> = {};
