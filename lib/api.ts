@@ -277,8 +277,32 @@ async function callApi<T>(
       return { success: false, error: "Sesi telah berakhir. Silakan login kembali." };
     }
 
-    const result = await response.json();
-    
+    // Handle payload too large (e.g. uncompressed photos exceeding the body limit).
+    // The platform returns plain text like "Request Entity Too Large", which is NOT
+    // valid JSON, so we must check this before attempting to parse.
+    if (response.status === 413) {
+      return {
+        success: false,
+        error: "Foto terlalu besar untuk dikirim. Coba ambil ulang foto, lalu kirim lagi.",
+      };
+    }
+
+    // Read as text first so a non-JSON response (HTML error page, plain-text
+    // gateway error, etc.) doesn't throw a cryptic "Unexpected token" error.
+    const responseText = await response.text();
+
+    let result: ApiResponse<T> & { message?: string };
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      console.error("[v0] Non-JSON response from API:", responseText.slice(0, 300));
+      return {
+        success: false,
+        error:
+          "Server mengembalikan respons yang tidak valid. Coba lagi; jika berlanjut, hubungi leader.",
+      };
+    }
+
     // GAS returns { success, data, message, error }
     // We pass it through directly since it matches our ApiResponse structure
     if (result.error === "GAS_NOT_CONFIGURED") {

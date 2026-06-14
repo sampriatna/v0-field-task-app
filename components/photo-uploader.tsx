@@ -4,6 +4,7 @@ import { useRef, useState, useCallback } from "react";
 import { Camera, X, CheckCircle2, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { compressImageFile } from "@/lib/image-utils";
 
 interface PhotoUploaderProps {
   label?: string;
@@ -46,17 +47,14 @@ export function PhotoUploader({
 
       setIsProcessing(true);
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
+      try {
+        const base64 = await compressImageFile(file);
         onChange(base64);
-        setIsProcessing(false);
-      };
-      reader.onerror = () => {
+      } catch {
         alert("Gagal membaca foto. Coba lagi.");
+      } finally {
         setIsProcessing(false);
-      };
-      reader.readAsDataURL(file);
+      }
     },
     [onChange]
   );

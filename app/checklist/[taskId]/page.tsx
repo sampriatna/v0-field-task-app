@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { getChecklistByToken, submitChecklistReport } from "@/lib/api";
+import { compressImageFile } from "@/lib/image-utils";
 import type { ChecklistReport, ChecklistReportItem } from "@/lib/types";
 
 type PageState = "loading" | "ready" | "submitting" | "success" | "error";
@@ -90,33 +91,34 @@ export default function StaffChecklistPage({
     }));
   };
 
-  const handleItemPhotoUpload = (itemId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleItemPhotoUpload = async (itemId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
+    try {
+      const compressed = await compressImageFile(file);
       setItemPhotos((prev) => ({
         ...prev,
-        [itemId]: result,
+        [itemId]: compressed,
       }));
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setErrorMessage("Gagal memproses foto. Coba ambil ulang.");
+    }
   };
 
-  const handleAfterPhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAfterPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploadingPhoto(true);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setAfterPhoto(result);
+    try {
+      const compressed = await compressImageFile(file);
+      setAfterPhoto(compressed);
+    } catch {
+      setErrorMessage("Gagal memproses foto. Coba ambil ulang.");
+    } finally {
       setIsUploadingPhoto(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const getDeadlineInfo = () => {
