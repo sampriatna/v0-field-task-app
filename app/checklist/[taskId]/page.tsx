@@ -177,7 +177,7 @@ export default function StaffChecklistPage({
       };
     }
 
-    // Check required per-item photos
+    // Count required per-item photos (excluding optional afterPhoto)
     const photoRequiredItems = checklist.items.filter(
       (item) => item.requires_photo && item.active_status && checkedItems[item.checklist_item_id]
     );
