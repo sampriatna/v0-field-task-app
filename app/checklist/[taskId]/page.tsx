@@ -226,10 +226,12 @@ export default function StaffChecklistPage({
       if (result.success) {
         setPageState("success");
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error || "Laporan gagal dikirim ke server (tanpa pesan). Coba lagi.");
       }
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "Gagal mengirim laporan");
+      const message = error instanceof Error && error.message ? error.message : "Gagal mengirim laporan. Coba lagi.";
+      console.error("[v0] Submit failed:", message);
+      setErrorMessage(message);
       setPageState("error");
     }
   };

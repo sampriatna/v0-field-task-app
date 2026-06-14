@@ -314,6 +314,19 @@ async function callApi<T>(
       return { success: false, error: result.error };
     }
 
+    // Defensive: GAS returned a falsy `success` but NO `error` field.
+    // Never let this bubble up as a blank error screen — surface a usable
+    // message (prefer GAS `message`) and log the raw payload for diagnosis.
+    if (!result.success) {
+      console.error("[v0] API returned success=false without error. Raw:", responseText.slice(0, 500));
+      return {
+        success: false,
+        error:
+          result.message ||
+          `Server menolak permintaan "${action}" tanpa pesan. Coba lagi; jika berlanjut, hubungi leader.`,
+      };
+    }
+
     // Return the GAS response directly - data is already in the right place
     return { success: result.success, data: result.data as T };
   } catch (error) {
