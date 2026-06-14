@@ -80,12 +80,15 @@ function needsAdminSecret(action: string): boolean {
   return action !== "healthCheck";
 }
 
-function isAdminAction(action: string): boolean {
-  return ADMIN_ACTIONS.includes(action);
-}
-
 function isPublicAction(action: string): boolean {
   return PUBLIC_ACTIONS.includes(action);
+}
+
+function isAdminAction(action: string): boolean {
+  // Public actions (staff report pages) must NEVER require login,
+  // even if they also appear in ADMIN_ACTIONS. Public takes precedence.
+  if (isPublicAction(action)) return false;
+  return ADMIN_ACTIONS.includes(action);
 }
 
 async function forwardToGas(
