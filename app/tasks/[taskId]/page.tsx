@@ -512,7 +512,7 @@ export default function TaskDetailPage() {
                 )}
                 
                 {/* Send Reminder Button for OPEN/LATE tasks */}
-                {task && (task.task_status === "OPEN" || task.task_status === "LATE" || task.task_status === "OPENED" || task.task_status === "CREATED" || task.task_status === "SENT") && (
+                {task && (task.status === "OPEN" || task.status === "LATE" || task.status === "OPENED" || task.status === "CREATED" || task.status === "SENT") && (
                   <Button
                     variant="outline"
                     onClick={handleSendReminder}
