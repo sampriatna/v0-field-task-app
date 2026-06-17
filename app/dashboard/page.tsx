@@ -32,6 +32,8 @@ const statusOptions: { value: TaskStatus | "ALL"; label: string }[] = [
   { value: "REVISI", label: "Perlu Revisi" },
 ];
 
+type TimePeriod = "today" | "week" | "month";
+
 // Helper function to check if task matches the filtered status
 // Uses same grouping logic as calculateTaskSummary
 function matchesStatusFilter(task: Task, selectedStatus: TaskStatus | "ALL"): boolean {
@@ -75,6 +77,42 @@ function getTodayDate(): string {
   return `${year}-${month}-${day}`;
 }
 
+// Check if a date is within the selected time period
+function isWithinTimePeriod(deadline: string, period: TimePeriod): boolean {
+  const today = new Date();
+  const todayDate = getTodayDate();
+  const taskDate = getTaskDate(deadline);
+  
+  if (!taskDate) return false;
+  
+  const taskDateObj = new Date(taskDate);
+  
+  switch (period) {
+    case "today":
+      return taskDate === todayDate;
+    case "week": {
+      // Get Monday of this week
+      const currentDay = today.getDay();
+      const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
+      const weekStart = new Date(today.setDate(diff));
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      
+      // Compare dates
+      const start = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
+      const end = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate());
+      
+      return taskDateObj >= start && taskDateObj <= end;
+    }
+    case "month": {
+      return taskDateObj.getFullYear() === today.getFullYear() && 
+             taskDateObj.getMonth() === today.getMonth();
+    }
+    default:
+      return false;
+  }
+}
+
 export default function DashboardPage() {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -104,7 +142,7 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOutlet, setSelectedOutlet] = useState<Outlet | "ALL">("ALL");
   const [selectedStatus, setSelectedStatus] = useState<TaskStatus | "ALL">("ALL");
-  const [todayFilter, setTodayFilter] = useState(true); // Default: show only today's tasks
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>("today");
   const [currentPage, setCurrentPage] = useState(1); // Pagination: 1-indexed
   const itemsPerPage = 10;
 
@@ -192,8 +230,8 @@ export default function DashboardPage() {
 
   const filteredTasks = manualTasks
     .filter((task) => {
-      // Apply date filter (today only)
-      if (todayFilter && getTaskDate(task.deadline) !== getTodayDate()) return false;
+      // Apply time period filter
+      if (!isWithinTimePeriod(task.deadline, timePeriod)) return false;
       
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -216,8 +254,8 @@ export default function DashboardPage() {
 
   const filteredChecklists = checklistTasks
     .filter((checklist) => {
-      // Apply date filter (today only)
-      if (todayFilter && getTaskDate(checklist.deadline) !== getTodayDate()) return false;
+      // Apply time period filter
+      if (!isWithinTimePeriod(checklist.deadline, timePeriod)) return false;
       
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -248,9 +286,9 @@ export default function DashboardPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [selectedOutlet, selectedStatus, searchQuery, todayFilter]);
+  }, [selectedOutlet, selectedStatus, searchQuery, timePeriod]);
 
-  const hasActiveFilters = selectedOutlet !== "ALL" || selectedStatus !== "ALL" || searchQuery !== "";
+  const hasActiveFilters = selectedOutlet !== "ALL" || selectedStatus !== "ALL" || searchQuery !== "" || timePeriod !== "today";
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -265,7 +303,7 @@ export default function DashboardPage() {
     setSelectedOutlet("ALL");
     setSelectedStatus("ALL");
     setSearchQuery("");
-    setTodayFilter(true); // Reset to today
+    setTimePeriod("today"); // Reset to today
   };
 
   const handleStatusClick = (status: TaskStatus | "ALL") => {
@@ -405,14 +443,33 @@ export default function DashboardPage() {
             {/* Filter Panel */}
             {showFilters && (
               <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
-                <Button
-                  variant={todayFilter ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setTodayFilter(!todayFilter)}
-                  className="text-xs"
-                >
-                  {todayFilter ? "📅 Hari Ini" : "📅 Semua Hari"}
-                </Button>
+                {/* Time Period Selector */}
+                <div className="flex gap-1 bg-card rounded p-1">
+                  <Button
+                    variant={timePeriod === "today" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setTimePeriod("today")}
+                    className="text-xs"
+                  >
+                    Hari Ini
+                  </Button>
+                  <Button
+                    variant={timePeriod === "week" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setTimePeriod("week")}
+                    className="text-xs"
+                  >
+                    Minggu Ini
+                  </Button>
+                  <Button
+                    variant={timePeriod === "month" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setTimePeriod("month")}
+                    className="text-xs"
+                  >
+                    Bulan Ini
+                  </Button>
+                </div>
                 
                 <Select
                   value={selectedOutlet}
@@ -443,7 +500,7 @@ export default function DashboardPage() {
                   </SelectContent>
                 </Select>
 
-                {(hasActiveFilters || todayFilter) && (
+                {hasActiveFilters && (
                   <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
                     <X className="w-4 h-4 mr-1" />
                     Reset
@@ -478,9 +535,9 @@ export default function DashboardPage() {
                   </div>
                   <h3 className="font-medium text-foreground mb-1">Tidak ada tugas ditemukan</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {hasActiveFilters || todayFilter ? "Coba ubah filter pencarian Anda" : "Belum ada tugas yang dibuat"}
+                    {hasActiveFilters ? "Coba ubah filter pencarian Anda" : "Belum ada tugas yang dibuat"}
                   </p>
-                  {(hasActiveFilters || todayFilter) ? (
+                  {hasActiveFilters ? (
                     <Button variant="outline" onClick={clearFilters}>Reset Filter</Button>
                   ) : (
                     <Link href="/tasks/new">
@@ -552,6 +609,34 @@ export default function DashboardPage() {
             {/* Filter Panel */}
             {showFilters && (
               <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+                {/* Time Period Selector */}
+                <div className="flex gap-1 bg-card rounded p-1">
+                  <Button
+                    variant={timePeriod === "today" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setTimePeriod("today")}
+                    className="text-xs"
+                  >
+                    Hari Ini
+                  </Button>
+                  <Button
+                    variant={timePeriod === "week" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setTimePeriod("week")}
+                    className="text-xs"
+                  >
+                    Minggu Ini
+                  </Button>
+                  <Button
+                    variant={timePeriod === "month" ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setTimePeriod("month")}
+                    className="text-xs"
+                  >
+                    Bulan Ini
+                  </Button>
+                </div>
+
                 <Select
                   value={selectedOutlet}
                   onValueChange={(v) => setSelectedOutlet(v as Outlet | "ALL")}
@@ -616,7 +701,7 @@ export default function DashboardPage() {
                   </div>
                   <h3 className="font-medium text-foreground mb-1">Tidak ada checklist ditemukan</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {hasActiveFilters ? "Coba ubah filter pencarian Anda" : "Belum ada checklist hari ini"}
+                    {hasActiveFilters ? "Coba ubah filter pencarian Anda" : "Belum ada checklist"}
                   </p>
                   {hasActiveFilters ? (
                     <Button variant="outline" onClick={clearFilters}>Reset Filter</Button>
