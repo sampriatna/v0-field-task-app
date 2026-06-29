@@ -89,7 +89,6 @@ export function PhotoUploader({
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         onChange={handleInputChange}
         className="hidden"
       />
