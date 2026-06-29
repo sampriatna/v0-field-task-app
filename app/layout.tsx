@@ -8,25 +8,25 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'Nusa Food Task & Report System',
+  title: 'TaskNF3 - Nusa Food Task & Report System',
   description: 'Sistem manajemen tugas operasional untuk Kopi Buri Umah, Kisamen Noodle Bar, dan Samtaro Express',
-  generator: 'v0.app',
+  generator: 'TaskNF3',
   icons: {
     icon: [
       {
-        url: '/icon-light-32x32.png',
+        url: '/icon-light-32x32.png?v=tasknf3-2',
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/icon-dark-32x32.png',
+        url: '/icon-dark-32x32.png?v=tasknf3-2',
         media: '(prefers-color-scheme: dark)',
       },
       {
-        url: '/icon.png',
+        url: '/icon.png?v=tasknf3-2',
         type: 'image/png',
       },
     ],
-    apple: '/apple-icon.png',
+    apple: '/apple-icon.png?v=tasknf3-2',
   },
 }
 

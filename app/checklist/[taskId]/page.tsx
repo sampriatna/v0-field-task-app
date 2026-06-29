@@ -414,7 +414,6 @@ export default function StaffChecklistPage({
                             <input
                               type="file"
                               accept="image/*"
-                              capture="environment"
                               onChange={(e) => handleItemPhotoUpload(item.checklist_item_id, e)}
                               className="hidden"
                             />
@@ -427,7 +426,6 @@ export default function StaffChecklistPage({
                           <input
                             type="file"
                             accept="image/*"
-                            capture="environment"
                             onChange={(e) => handleItemPhotoUpload(item.checklist_item_id, e)}
                             className="hidden"
                           />
@@ -462,7 +460,6 @@ export default function StaffChecklistPage({
                   <input
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     onChange={handleAfterPhotoUpload}
                     className="hidden"
                   />
@@ -481,7 +478,6 @@ export default function StaffChecklistPage({
                 <input
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   onChange={handleAfterPhotoUpload}
                   className="hidden"
                   disabled={isUploadingPhoto}
