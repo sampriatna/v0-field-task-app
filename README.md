@@ -24,6 +24,17 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Dokumentasi Versi 2
+
+Perencanaan migrasi v1 → v2 (dengan v1 tetap jalan selama transisi):
+
+- [docs/V2_README.md](./docs/V2_README.md) — Index dokumentasi v2
+- [docs/V2_MIGRATION_STRATEGY.md](./docs/V2_MIGRATION_STRATEGY.md) — Strategi migrasi bertahap
+- [docs/V2_DATABASE_SCHEMA.md](./docs/V2_DATABASE_SCHEMA.md) — Schema PostgreSQL
+- [docs/V2_API_SPEC.md](./docs/V2_API_SPEC.md) — Spesifikasi REST API
+- [docs/V2_REPO_STRUCTURE.md](./docs/V2_REPO_STRUCTURE.md) — Blueprint repo & tech stack
+- [docs/V2_ROLLBACK_PLAN.md](./docs/V2_ROLLBACK_PLAN.md) — Prosedur rollback darurat
+
 ## Learn More
 
 To learn more, take a look at the following resources:
