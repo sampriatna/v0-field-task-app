@@ -33,6 +33,29 @@ import {
 // Internal API endpoint - no longer expose GAS URL directly
 const API_BASE = "/api/gas";
 
+// =============================================
+// API CALL LOGGING - DEBUG ONLY
+// =============================================
+// In-memory log for debugging API calls (cleared on page refresh)
+interface ApiCallLogEntry {
+  timestamp: string;
+  action: string;
+  method: "GET" | "POST";
+  status: "success" | "error" | "pending";
+  duration_ms: number;
+  error?: string;
+}
+
+const API_CALL_LOG: ApiCallLogEntry[] = [];
+
+// Export log to window for debugging via console
+if (typeof window !== "undefined") {
+  (window as any).__vz_apiLog = API_CALL_LOG;
+  (window as any).__vz_showApiLog = () => {
+    console.table(API_CALL_LOG);
+  };
+}
+
 // Robust normalizer untuk berbagai format response dari GAS
 function normalizeTaskList(data: unknown): Task[] {
   if (!data) return [];
@@ -242,7 +265,56 @@ function normalizeChecklistReport(data: unknown): ChecklistReport | null {
 export function buildReportLink(taskId: string, token: string, origin?: string): string {
   const base =
     origin || (typeof window !== "undefined" ? window.location.origin : "");
-  return `${base}/report/${taskId}?token=${token}`;
+  
+  const cleanTaskId = String(taskId).trim();
+  const cleanToken = String(token).trim();
+  
+  if (!cleanTaskId || !cleanToken) {
+    console.error("[v0] Invalid report link params:", { cleanTaskId, cleanToken });
+    return "";
+  }
+  
+  return `${base}/report/${cleanTaskId}?token=${cleanToken}`;
+}
+
+// Normalize report link format from GAS response
+// GAS might return link in different formats; ensure consistency
+export function normalizeReportLink(
+  gasLink: string | undefined,
+  taskId: string,
+  token: string,
+  origin?: string
+): string {
+  // If no link from GAS, build standard format
+  if (!gasLink) {
+    return buildReportLink(taskId, token, origin);
+  }
+
+  // If GAS returns full URL, extract path+query or validate format
+  try {
+    const baseUrl = origin || (typeof window !== "undefined" ? window.location.origin : "");
+    const url = new URL(gasLink, baseUrl);
+    const pathAndQuery = `${url.pathname}${url.search}`;
+    
+    // Validate link contains task_id and token
+    if (pathAndQuery.includes(taskId) && pathAndQuery.includes(token)) {
+      return pathAndQuery;
+    }
+  } catch {
+    // gasLink is relative path or malformed URL
+  }
+
+  // GAS might return relative path — validate format
+  if (gasLink.includes(taskId) && gasLink.includes(token)) {
+    return gasLink;
+  }
+
+  // Fallback to standard format if GAS link is invalid
+  console.warn(
+    "[v0] GAS returned invalid report link format. Using standard format.",
+    { gasLink, taskId, token }
+  );
+  return buildReportLink(taskId, token, origin);
 }
 
 async function callApi<T>(
@@ -250,7 +322,17 @@ async function callApi<T>(
   payload?: Record<string, unknown>,
   method: "GET" | "POST" = "POST"
 ): Promise<ApiResponse<T>> {
+  const startTime = performance.now();
+  const timestamp = new Date().toISOString();
+  const logEntry: Partial<ApiCallLogEntry> = {
+    timestamp,
+    action,
+    method,
+    status: "pending",
+  };
+
   try {
+    console.log(`[v0] API Call: ${method} action="${action}"`);
     let response: Response;
 
     if (method === "GET") {
@@ -271,6 +353,13 @@ async function callApi<T>(
 
     // Handle 401 - redirect to login
     if (response.status === 401) {
+      const duration = performance.now() - startTime;
+      logEntry.status = "error";
+      logEntry.error = "Unauthorized";
+      logEntry.duration_ms = Math.round(duration);
+      API_CALL_LOG.push(logEntry as ApiCallLogEntry);
+      console.warn(`[v0] API Error: 401 Unauthorized - session expired`);
+      
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
@@ -281,6 +370,12 @@ async function callApi<T>(
     // The platform returns plain text like "Request Entity Too Large", which is NOT
     // valid JSON, so we must check this before attempting to parse.
     if (response.status === 413) {
+      const duration = performance.now() - startTime;
+      logEntry.status = "error";
+      logEntry.error = "Payload too large";
+      logEntry.duration_ms = Math.round(duration);
+      API_CALL_LOG.push(logEntry as ApiCallLogEntry);
+      console.warn(`[v0] API Error: 413 Payload Too Large`);
       return {
         success: false,
         error: "Foto terlalu besar untuk dikirim. Coba ambil ulang foto, lalu kirim lagi.",
@@ -295,6 +390,11 @@ async function callApi<T>(
     try {
       result = JSON.parse(responseText);
     } catch {
+      const duration = performance.now() - startTime;
+      logEntry.status = "error";
+      logEntry.error = "Non-JSON response";
+      logEntry.duration_ms = Math.round(duration);
+      API_CALL_LOG.push(logEntry as ApiCallLogEntry);
       console.error("[v0] Non-JSON response from API:", responseText.slice(0, 300));
       return {
         success: false,
@@ -306,18 +406,43 @@ async function callApi<T>(
     // GAS returns { success, data, message, error }
     // We pass it through directly since it matches our ApiResponse structure
     if (result.error === "GAS_NOT_CONFIGURED") {
+      const duration = performance.now() - startTime;
+      logEntry.status = "error";
+      logEntry.error = "GAS_NOT_CONFIGURED";
+      logEntry.duration_ms = Math.round(duration);
+      API_CALL_LOG.push(logEntry as ApiCallLogEntry);
+      console.warn(`[v0] GAS not configured`);
       return { success: false, error: "GAS_NOT_CONFIGURED" };
     }
 
     // Check for GAS errors
     if (!result.success && result.error) {
+      const duration = performance.now() - startTime;
+      logEntry.status = "error";
+      logEntry.error = result.error;
+      logEntry.duration_ms = Math.round(duration);
+      API_CALL_LOG.push(logEntry as ApiCallLogEntry);
+      console.warn(`[v0] API Error: ${result.error}`);
       return { success: false, error: result.error };
     }
+
+    // Success
+    const duration = performance.now() - startTime;
+    logEntry.status = "success";
+    logEntry.duration_ms = Math.round(duration);
+    API_CALL_LOG.push(logEntry as ApiCallLogEntry);
+    console.log(`[v0] API Success: action="${action}", duration=${Math.round(duration)}ms`);
 
     // Return the GAS response directly - data is already in the right place
     return { success: result.success, data: result.data as T };
   } catch (error) {
-    console.error("API Error:", error);
+    const duration = performance.now() - startTime;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    logEntry.status = "error";
+    logEntry.error = errorMsg;
+    logEntry.duration_ms = Math.round(duration);
+    API_CALL_LOG.push(logEntry as ApiCallLogEntry);
+    console.error("[v0] API Exception:", errorMsg);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Terjadi kesalahan saat menghubungi server",

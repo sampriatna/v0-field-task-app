@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getSession, isAuthenticated } from "@/lib/auth";
 
 // Actions that require admin authentication
+// NOTE: Do NOT include public actions here (getChecklistByToken, submitChecklistReport, etc.)
+// Public actions are checked via isPublicAction() and SKIP admin auth
 const ADMIN_ACTIONS = [
   "createTask",
   "getTasks",
@@ -52,16 +54,7 @@ const ADMIN_ACTIONS = [
   "getChecklistTemplates",
   "createChecklistTemplate",
   "updateChecklistTemplate",
-  "getChecklistItems",
-  "saveChecklistItems",
   "generateChecklistReport",
-  "getChecklistReports",
-  "getChecklistDetail",
-  "getChecklistByToken",
-  "submitChecklistReport",
-  "approveChecklist",
-  "requestChecklistRevision",
-  "resendChecklistWhatsApp",
 ];
 
 // Actions that are public (staff report pages) - no LOGIN needed, but still need admin_secret for GAS
@@ -75,9 +68,10 @@ const PUBLIC_ACTIONS = [
   "submitChecklistReport",
 ];
 
-// All non-healthCheck actions need admin_secret for GAS
+// Only admin actions need admin_secret for GAS
+// Public actions (staff report pages) should NOT include admin_secret
 function needsAdminSecret(action: string): boolean {
-  return action !== "healthCheck";
+  return !isPublicAction(action) && action !== "healthCheck";
 }
 
 function isPublicAction(action: string): boolean {
@@ -85,8 +79,10 @@ function isPublicAction(action: string): boolean {
 }
 
 function isAdminAction(action: string): boolean {
-  // Public actions (staff report pages) must NEVER require login,
-  // even if they also appear in ADMIN_ACTIONS. Public takes precedence.
+  // CRITICAL: Public actions (staff report pages) must NEVER require login.
+  // Even if a public action is accidentally added to ADMIN_ACTIONS, 
+  // this function ensures it's treated as public (returns false).
+  // This prevents 401 errors when staff open WhatsApp links.
   if (isPublicAction(action)) return false;
   return ADMIN_ACTIONS.includes(action);
 }
