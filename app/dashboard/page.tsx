@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight, AlertTriangle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
-import { getTasks, getChecklistReports } from "@/lib/api";
+import { getTasks, getChecklistReports, getDashboardSummary } from "@/lib/api";
 import type { Task, DashboardSummary, TaskStatus, Outlet, ChecklistReport, ChecklistSummary } from "@/lib/types";
 import { outlets } from "@/lib/mock-data";
 import { StatusBadge } from "@/components/status-badge";
@@ -196,18 +196,44 @@ export default function DashboardPage() {
     setLoadError(null);
 
     try {
-      const tasksResult = await getTasks();
+      // Phase 1: Load dashboard summary for stats (fast)
+      const summaryResult = await getDashboardSummary({
+        useCache: true,
+        recent_limit: 50,
+      });
 
-      if (tasksResult.success && tasksResult.data) {
-        setTasks(tasksResult.data);
-        setSummary(calculateTaskSummary(tasksResult.data));
-        setChecklistSummary(calculateChecklistSummary(tasksResult.data));
+      if (summaryResult.success && summaryResult.data) {
+        // Use summary data for statistics
+        setSummary(summaryResult.data);
       } else {
-        setTasks([]);
-        setLoadError(tasksResult.error || "Gagal memuat tugas");
+        setLoadError(summaryResult.error || "Gagal memuat ringkasan tugas");
       }
 
-      // Load checklists separately (non-blocking)
+      // Phase 2: Load full task details in parallel (for task list rendering)
+      try {
+        const tasksResult = await getTasks();
+
+        if (tasksResult.success && tasksResult.data) {
+          setTasks(tasksResult.data);
+          // Recalculate summaries from full data for accuracy
+          setSummary(calculateTaskSummary(tasksResult.data));
+          setChecklistSummary(calculateChecklistSummary(tasksResult.data));
+        } else {
+          setTasks([]);
+          if (!summaryResult.success) {
+            setLoadError(tasksResult.error || "Gagal memuat tugas");
+          }
+        }
+      } catch (error) {
+        if (!summaryResult.success) {
+          setLoadError(
+            error instanceof Error ? error.message : "Gagal memuat data tugas"
+          );
+        }
+        setTasks([]);
+      }
+
+      // Phase 3: Load checklists separately (non-blocking)
       try {
         const checklistsResult = await getChecklistReports();
         if (checklistsResult.success && checklistsResult.data) {

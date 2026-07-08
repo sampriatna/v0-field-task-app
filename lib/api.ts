@@ -56,6 +56,43 @@ if (typeof window !== "undefined") {
   };
 }
 
+// =============================================
+// CACHE SYSTEM FOR DASHBOARD SUMMARY
+// =============================================
+// Light cache (15-30s) to avoid repeated API calls during dashboard interactions
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const CACHE_DURATION_MS = 20000; // 20 seconds cache TTL
+const dashboardSummaryCache = new Map<string, CacheEntry<DashboardSummary>>();
+
+function getCachedSummary(cacheKey: string): DashboardSummary | null {
+  const cached = dashboardSummaryCache.get(cacheKey);
+  if (!cached) return null;
+
+  const now = Date.now();
+  if (now - cached.timestamp > CACHE_DURATION_MS) {
+    // Cache expired
+    dashboardSummaryCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.data;
+}
+
+function setCachedSummary(cacheKey: string, data: DashboardSummary) {
+  dashboardSummaryCache.set(cacheKey, {
+    data,
+    timestamp: Date.now(),
+  });
+}
+
+function clearSummaryCache() {
+  dashboardSummaryCache.clear();
+}
+
 // Robust normalizer untuk berbagai format response dari GAS
 function normalizeTaskList(data: unknown): Task[] {
   if (!data) return [];
@@ -634,13 +671,41 @@ export async function getTaskDetail(taskId: string): Promise<ApiResponse<Task>> 
   }
 }
 
-export async function getDashboardSummary(): Promise<ApiResponse<DashboardSummary>> {
+export async function getDashboardSummary(
+  options?: {
+    useCache?: boolean;
+    recent_limit?: number;
+  }
+): Promise<ApiResponse<DashboardSummary>> {
   try {
-    const result = await callApi<DashboardSummary>("getDashboardSummary", undefined, "GET");
+    const cacheKey = "dashboard-summary";
+    const { useCache = true, recent_limit = 50 } = options || {};
+
+    // Check cache first if enabled
+    if (useCache) {
+      const cached = getCachedSummary(cacheKey);
+      if (cached) {
+        console.log("[v0] Dashboard summary from cache (20s TTL)");
+        return { success: true, data: cached };
+      }
+    }
+
+    const result = await callApi<DashboardSummary>(
+      "getDashboardSummary",
+      { recent_limit },
+      "GET"
+    );
 
     if (result.error === "GAS_NOT_CONFIGURED") {
       await delay(300);
-      return { success: true, data: mockDashboardSummary };
+      const mockData = mockDashboardSummary;
+      setCachedSummary(cacheKey, mockData);
+      return { success: true, data: mockData };
+    }
+
+    // Cache successful result
+    if (result.success && result.data) {
+      setCachedSummary(cacheKey, result.data);
     }
 
     return result;
