@@ -32,6 +32,11 @@ export async function GET(req: NextRequest) {
   const checklistMode = sp.get("checklist_mode")
   if (checklistMode !== null) where.checklistMode = checklistMode === "true"
 
+  const ticketType = sp.get("ticket_type")?.toUpperCase()
+  if (ticketType && ["TASK", "ISSUE", "COACHING", "CHECKLIST"].includes(ticketType)) {
+    where.ticketType = ticketType as Prisma.TaskWhereInput["ticketType"]
+  }
+
   const dateFrom = sp.get("date_from")
   const dateTo = sp.get("date_to")
   if (dateFrom || dateTo) {
@@ -119,6 +124,9 @@ export async function POST(req: NextRequest) {
               categoryName: category?.name ?? null,
               taskTitle: input.task_title,
               taskDescription: input.task_description || null,
+              ticketType: input.ticket_type,
+              // Keep the v1-compat flag in sync with the new enum.
+              checklistMode: input.ticket_type === "CHECKLIST",
               priority: input.priority,
               picName: input.pic_name,
               picWa: input.pic_wa,
@@ -137,7 +145,12 @@ export async function POST(req: NextRequest) {
               entityId: taskId,
               action: "created",
               actorType: "leader",
-              newValue: { task_title: task.taskTitle, status: task.status, pic_wa: task.picWa },
+              newValue: {
+                task_title: task.taskTitle,
+                ticket_type: task.ticketType,
+                status: task.status,
+                pic_wa: task.picWa,
+              },
             },
             tx,
           )

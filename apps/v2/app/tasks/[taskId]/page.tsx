@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { apiGet } from "@/lib/api-client"
-import { statusLabel, PRIORITY_TONE } from "@/lib/labels"
+import { statusLabel, ticketTypeLabel, PRIORITY_TONE } from "@/lib/labels"
 import { fmtDateTime } from "@/lib/format"
 import type { TaskDetail } from "@/lib/client-types"
 import { Badge } from "@/components/badge"
@@ -84,6 +84,10 @@ export default function TaskDetailPage() {
           <div className="sub mono">{task.task_id}</div>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <Badge
+            label={ticketTypeLabel(task.ticket_type).label}
+            tone={ticketTypeLabel(task.ticket_type).tone}
+          />
           <Badge label={task.priority} tone={PRIORITY_TONE[task.priority] ?? "neutral"} />
           <Badge label={s.label} tone={s.tone} />
         </div>
@@ -101,7 +105,7 @@ export default function TaskDetailPage() {
             </Field>
             <Field label="Deadline">{fmtDateTime(task.deadline)}</Field>
             <Field label="Dibuat oleh">{task.created_by ?? "—"}</Field>
-            <Field label="Mode">{task.checklist_mode ? "Checklist" : "Manual"}</Field>
+            <Field label="Jenis Ticket">{ticketTypeLabel(task.ticket_type).label}</Field>
             <Field label="Durasi">
               {task.duration_minutes != null ? `${task.duration_minutes} menit` : "—"}
             </Field>

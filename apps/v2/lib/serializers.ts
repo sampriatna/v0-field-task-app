@@ -19,6 +19,7 @@ export function serializeTask(t: TaskWithRelations) {
     category: t.category?.name ?? t.categoryName ?? null,
     task_title: t.taskTitle,
     task_description: t.taskDescription ?? "",
+    ticket_type: t.ticketType,
     priority: t.priority,
     pic_name: t.picName,
     pic_wa: t.picWa,

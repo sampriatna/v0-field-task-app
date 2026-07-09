@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { apiGet } from "@/lib/api-client"
-import { statusLabel, PRIORITY_TONE } from "@/lib/labels"
+import { statusLabel, ticketTypeLabel, PRIORITY_TONE, TICKET_TYPES, TICKET_TYPE_META } from "@/lib/labels"
 import { fmtDeadline } from "@/lib/format"
 import type { Outlet, TaskRow } from "@/lib/client-types"
 import { Badge } from "@/components/badge"
@@ -16,6 +16,7 @@ export default function TasksPage() {
   const [outlets, setOutlets] = useState<Outlet[]>([])
   const [outlet, setOutlet] = useState("")
   const [status, setStatus] = useState("")
+  const [ticketType, setTicketType] = useState("")
   const [page, setPage] = useState(1)
 
   const [tasks, setTasks] = useState<TaskRow[] | null>(null)
@@ -32,7 +33,7 @@ export default function TasksPage() {
   // Reset to first page whenever a filter changes.
   useEffect(() => {
     setPage(1)
-  }, [outlet, status])
+  }, [outlet, status, ticketType])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -41,6 +42,7 @@ export default function TasksPage() {
       const q = new URLSearchParams()
       if (outlet) q.set("outlet", outlet)
       if (status) q.set("status", status)
+      if (ticketType) q.set("ticket_type", ticketType)
       q.set("page", String(page))
       q.set("limit", String(LIMIT))
       const res = await apiGet<TaskRow[]>(`/api/tasks?${q.toString()}`)
@@ -52,7 +54,7 @@ export default function TasksPage() {
     } finally {
       setLoading(false)
     }
-  }, [outlet, status, page])
+  }, [outlet, status, ticketType, page])
 
   useEffect(() => {
     load()
@@ -104,6 +106,17 @@ export default function TasksPage() {
             <option value="REVISI">Revisi</option>
           </select>
         </div>
+        <div className="field">
+          <label htmlFor="ticketType">Jenis</label>
+          <select id="ticketType" value={ticketType} onChange={(e) => setTicketType(e.target.value)}>
+            <option value="">Semua jenis</option>
+            {TICKET_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {TICKET_TYPE_META[t].label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {error ? (
@@ -117,10 +130,10 @@ export default function TasksPage() {
           <table>
             <thead>
               <tr>
-                <th>Tugas</th>
+                <th>Ticket</th>
+                <th>Jenis</th>
                 <th>Outlet</th>
                 <th>Area</th>
-                <th>Kategori</th>
                 <th>PIC</th>
                 <th>Deadline</th>
                 <th>Prioritas</th>
@@ -141,9 +154,14 @@ export default function TasksPage() {
                           {t.task_title}
                           <div className="mono">{t.task_id}</div>
                         </td>
+                        <td>
+                          <Badge
+                            label={ticketTypeLabel(t.ticket_type).label}
+                            tone={ticketTypeLabel(t.ticket_type).tone}
+                          />
+                        </td>
                         <td>{t.outlet ?? "—"}</td>
                         <td>{t.area ?? "—"}</td>
-                        <td>{t.category ?? "—"}</td>
                         <td>{t.pic_name}</td>
                         <td>{fmtDeadline(t.deadline)}</td>
                         <td>

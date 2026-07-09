@@ -47,6 +47,15 @@ enum TaskPriority {
   Urgent
 }
 
+// Work Log ticket classification. TASK is the default so all existing rows
+// and v1-style flows keep working unchanged; CHECKLIST mirrors checklist_mode.
+enum TicketType {
+  TASK
+  ISSUE
+  COACHING
+  CHECKLIST
+}
+
 enum RepeatType {
   daily
   weekdays
@@ -179,6 +188,7 @@ model Task {
   categoryName        String?      @map("category_name") @db.VarChar(100)
   taskTitle           String       @map("task_title") @db.VarChar(500)
   taskDescription     String?      @map("task_description")
+  ticketType          TicketType   @default(TASK) @map("ticket_type")
   priority            TaskPriority @default(Medium)
   picName             String       @map("pic_name") @db.VarChar(200)
   picWa               String       @map("pic_wa") @db.VarChar(20)
@@ -217,6 +227,7 @@ model Task {
   @@index([taskId, token])
   @@index([picWa])
   @@index([createdAt(sort: Desc)])
+  @@index([ticketType])
   @@map("tasks")
 }
 

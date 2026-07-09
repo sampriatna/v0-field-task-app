@@ -37,3 +37,18 @@ export const PRIORITY_TONE: Record<string, Tone> = {
   High: "orange",
   Urgent: "danger",
 }
+
+// Work Log ticket types (order = display order in forms/filters).
+export const TICKET_TYPES = ["TASK", "ISSUE", "COACHING", "CHECKLIST"] as const
+export type TicketType = (typeof TICKET_TYPES)[number]
+
+export const TICKET_TYPE_META: Record<TicketType, { label: string; tone: Tone }> = {
+  TASK: { label: "Tugas", tone: "info" },
+  ISSUE: { label: "Issue", tone: "danger" },
+  COACHING: { label: "Coaching", tone: "indigo" },
+  CHECKLIST: { label: "Checklist", tone: "sky" },
+}
+
+export function ticketTypeLabel(t: string): { label: string; tone: Tone } {
+  return TICKET_TYPE_META[t as TicketType] ?? { label: t || "—", tone: "neutral" }
+}

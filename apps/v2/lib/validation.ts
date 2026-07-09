@@ -8,6 +8,7 @@ export const createTaskSchema = z.object({
   category: z.string().min(1).optional(),
   task_title: z.string().min(1, "Judul tugas wajib diisi").max(500),
   task_description: z.string().max(5000).optional().default(""),
+  ticket_type: z.enum(["TASK", "ISSUE", "COACHING", "CHECKLIST"]).default("TASK"),
   priority: z.enum(["Low", "Medium", "High", "Urgent"]).default("Medium"),
   pic_name: z.string().min(1, "Nama PIC wajib diisi").max(200),
   pic_wa: z
@@ -22,6 +23,7 @@ export const createTaskSchema = z.object({
 export type CreateTaskInput = z.infer<typeof createTaskSchema>
 
 const FIELD_LABELS: Record<string, string> = {
+  ticket_type: "Jenis ticket",
   outlet: "Outlet",
   area: "Area",
   category: "Kategori",

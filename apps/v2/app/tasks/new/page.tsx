@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { apiGet, apiPost } from "@/lib/api-client"
+import { TICKET_TYPES, TICKET_TYPE_META, type TicketType } from "@/lib/labels"
 import type { Outlet, TaskDetail } from "@/lib/client-types"
 
 interface Area {
@@ -25,6 +26,7 @@ export default function NewTaskPage() {
   const [areas, setAreas] = useState<Area[]>([])
   const [categories, setCategories] = useState<Category[]>([])
 
+  const [ticketType, setTicketType] = useState<TicketType>("TASK")
   const [outlet, setOutlet] = useState("")
   const [area, setArea] = useState("")
   const [category, setCategory] = useState("")
@@ -67,6 +69,7 @@ export default function NewTaskPage() {
     setSubmitting(true)
     try {
       const payload = {
+        ticket_type: ticketType,
         outlet,
         area: area || undefined,
         category: category || undefined,
@@ -101,6 +104,22 @@ export default function NewTaskPage() {
 
       <form className="card form-card" onSubmit={handleSubmit}>
         {error ? <div className="form-error">⚠ {error}</div> : null}
+
+        <div className="form-field">
+          <label htmlFor="ticketType">Jenis Ticket *</label>
+          <select
+            id="ticketType"
+            value={ticketType}
+            onChange={(e) => setTicketType(e.target.value as TicketType)}
+            required
+          >
+            {TICKET_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {TICKET_TYPE_META[t].label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div className="form-grid">
           <div className="form-field">

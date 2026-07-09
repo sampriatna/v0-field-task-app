@@ -27,6 +27,7 @@ export interface TaskRow {
   area: string | null
   category: string | null
   task_title: string
+  ticket_type: string
   priority: string
   pic_name: string
   deadline: string | null
