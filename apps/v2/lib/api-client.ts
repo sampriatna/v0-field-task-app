@@ -35,3 +35,24 @@ export async function apiGet<T>(path: string, init?: RequestInit): Promise<ApiRe
 
   return { data: body.data, meta: body.meta }
 }
+
+export async function apiPost<T>(path: string, payload: unknown): Promise<ApiResult<T>> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  })
+
+  let body: Envelope<T>
+  try {
+    body = (await res.json()) as Envelope<T>
+  } catch {
+    throw new Error(`Respons tidak valid dari server (HTTP ${res.status})`)
+  }
+
+  if (!res.ok || !body.success || body.data === null) {
+    throw new Error(body.error ?? `Gagal menyimpan data (HTTP ${res.status})`)
+  }
+
+  return { data: body.data, meta: body.meta }
+}

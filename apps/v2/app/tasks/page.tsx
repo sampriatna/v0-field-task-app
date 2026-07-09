@@ -72,9 +72,14 @@ export default function TasksPage() {
           <h1>Daftar Tugas</h1>
           <div className="sub">Semua tugas manual dari REST API v2</div>
         </div>
-        <button type="button" className="btn" onClick={load} disabled={loading}>
-          {loading ? "Memuat…" : "↻ Refresh"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" className="btn" onClick={load} disabled={loading}>
+            {loading ? "Memuat…" : "↻ Refresh"}
+          </button>
+          <Link href="/tasks/new" className="btn btn-accent">
+            + Buat Tugas
+          </Link>
+        </div>
       </div>
 
       <div className="toolbar">

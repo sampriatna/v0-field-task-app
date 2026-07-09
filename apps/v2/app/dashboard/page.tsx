@@ -88,9 +88,14 @@ export default function DashboardPage() {
           <h1>Dashboard v2</h1>
           <div className="sub">Nusa Food Task System — data langsung dari REST API v2</div>
         </div>
-        <button type="button" className="btn" onClick={load} disabled={loading}>
-          {loading ? "Memuat…" : "↻ Refresh"}
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" className="btn" onClick={load} disabled={loading}>
+            {loading ? "Memuat…" : "↻ Refresh"}
+          </button>
+          <Link href="/tasks/new" className="btn btn-accent">
+            + Buat Tugas
+          </Link>
+        </div>
       </div>
 
       <div className="toolbar">

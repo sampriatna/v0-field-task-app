@@ -11,9 +11,6 @@ const nextConfig = {
     root: __dirname,
   },
   outputFileTracingRoot: __dirname,
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: false,
   },
