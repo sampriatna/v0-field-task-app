@@ -4,37 +4,20 @@ import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { apiGet } from "@/lib/api-client"
-import { statusLabel, PRIORITY_TONE, type Tone } from "@/lib/labels"
+import { statusLabel, PRIORITY_TONE } from "@/lib/labels"
 import { fmtDeadline } from "@/lib/format"
-import type { FullSummary, Summary, Outlet, TaskRow } from "@/lib/client-types"
-import { StatTile } from "@/components/stat-tile"
+import type { Outlet, TaskRow } from "@/lib/client-types"
 import { Badge } from "@/components/badge"
 
-const TASK_TILES: { key: keyof Summary; label: string; tone: Tone; filter?: string }[] = [
-  { key: "total", label: "Total Tugas", tone: "neutral" },
-  { key: "open", label: "Open", tone: "info", filter: "OPEN" },
-  { key: "submitted", label: "Submitted", tone: "warn", filter: "SUBMITTED" },
-  { key: "done", label: "Done", tone: "success", filter: "DONE" },
-  { key: "late", label: "Late", tone: "danger" },
-  { key: "revisi", label: "Revisi", tone: "orange", filter: "REVISI" },
-]
+const LIMIT = 20
 
-const CHECKLIST_TILES: { key: keyof Summary; label: string; tone: Tone }[] = [
-  { key: "total", label: "Total Checklist", tone: "neutral" },
-  { key: "open", label: "Belum Dikerjakan", tone: "info" },
-  { key: "submitted", label: "Sudah Submit", tone: "warn" },
-  { key: "done", label: "Selesai", tone: "success" },
-  { key: "late", label: "Telat", tone: "danger" },
-  { key: "revisi", label: "Perlu Revisi", tone: "orange" },
-]
-
-export default function DashboardPage() {
+export default function TasksPage() {
   const router = useRouter()
   const [outlets, setOutlets] = useState<Outlet[]>([])
   const [outlet, setOutlet] = useState("")
   const [status, setStatus] = useState("")
+  const [page, setPage] = useState(1)
 
-  const [summary, setSummary] = useState<FullSummary | null>(null)
   const [tasks, setTasks] = useState<TaskRow[] | null>(null)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -46,47 +29,48 @@ export default function DashboardPage() {
       .catch(() => {})
   }, [])
 
+  // Reset to first page whenever a filter changes.
+  useEffect(() => {
+    setPage(1)
+  }, [outlet, status])
+
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const q = new URLSearchParams()
       if (outlet) q.set("outlet", outlet)
-      const taskQ = new URLSearchParams(q)
-      if (status) taskQ.set("status", status)
-      taskQ.set("limit", "10")
-
-      const [sum, list] = await Promise.all([
-        apiGet<FullSummary>(`/api/dashboard/summary?${q.toString()}`),
-        apiGet<TaskRow[]>(`/api/tasks?${taskQ.toString()}`),
-      ])
-      setSummary(sum.data)
-      setTasks(list.data)
-      setTotal(list.meta?.total ?? list.data.length)
+      if (status) q.set("status", status)
+      q.set("page", String(page))
+      q.set("limit", String(LIMIT))
+      const res = await apiGet<TaskRow[]>(`/api/tasks?${q.toString()}`)
+      setTasks(res.data)
+      setTotal(res.meta?.total ?? res.data.length)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Gagal memuat data")
-      setSummary(null)
       setTasks(null)
     } finally {
       setLoading(false)
     }
-  }, [outlet, status])
+  }, [outlet, status, page])
 
   useEffect(() => {
     load()
   }, [load])
 
-  const toggleStatus = (filter?: string) => {
-    if (!filter) return
-    setStatus((cur) => (cur === filter ? "" : filter))
-  }
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT))
+  const from = total === 0 ? 0 : (page - 1) * LIMIT + 1
+  const to = Math.min(page * LIMIT, total)
 
   return (
     <main className="container">
       <div className="page-head">
         <div>
-          <h1>Dashboard v2</h1>
-          <div className="sub">Nusa Food Task System — data langsung dari REST API v2</div>
+          <div className="crumbs">
+            <Link href="/dashboard">Dashboard</Link> / <span>Tugas</span>
+          </div>
+          <h1>Daftar Tugas</h1>
+          <div className="sub">Semua tugas manual dari REST API v2</div>
         </div>
         <button type="button" className="btn" onClick={load} disabled={loading}>
           {loading ? "Memuat…" : "↻ Refresh"}
@@ -106,7 +90,7 @@ export default function DashboardPage() {
           </select>
         </div>
         <div className="field">
-          <label htmlFor="status">Status tugas</label>
+          <label htmlFor="status">Status</label>
           <select id="status" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">Semua status</option>
             <option value="OPEN">Open</option>
@@ -119,51 +103,10 @@ export default function DashboardPage() {
 
       {error ? (
         <div className="card">
-          <div className="state error">
-            ⚠ {error}
-            <div style={{ marginTop: 8, color: "var(--text-muted)" }}>
-              Pastikan <code>DATABASE_URL</code> terisi dan migrasi + seed sudah dijalankan.
-            </div>
-          </div>
+          <div className="state error">⚠ {error}</div>
         </div>
       ) : null}
 
-      <div className="section-title">Tugas Manual</div>
-      <div className="stat-grid">
-        {TASK_TILES.map((t) => (
-          <StatTile
-            key={t.key}
-            label={t.label}
-            value={summary?.tasks[t.key] ?? 0}
-            tone={t.tone}
-            loading={loading && !summary}
-            active={!!t.filter && status === t.filter}
-            onClick={t.filter ? () => toggleStatus(t.filter) : undefined}
-          />
-        ))}
-      </div>
-
-      <div className="section-title">Checklist</div>
-      <div className="stat-grid">
-        {CHECKLIST_TILES.map((t) => (
-          <StatTile
-            key={t.key}
-            label={t.label}
-            value={summary?.checklists[t.key] ?? 0}
-            tone={t.tone}
-            loading={loading && !summary}
-          />
-        ))}
-      </div>
-
-      <div className="section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span>
-          Tugas Terbaru{status ? ` — ${statusLabel(status).label}` : ""} ({total})
-        </span>
-        <Link href="/tasks" style={{ textTransform: "none", letterSpacing: 0, fontSize: "0.8rem" }}>
-          Lihat semua →
-        </Link>
-      </div>
       <div className="card">
         <div className="table-wrap">
           <table>
@@ -172,6 +115,7 @@ export default function DashboardPage() {
                 <th>Tugas</th>
                 <th>Outlet</th>
                 <th>Area</th>
+                <th>Kategori</th>
                 <th>PIC</th>
                 <th>Deadline</th>
                 <th>Prioritas</th>
@@ -194,6 +138,7 @@ export default function DashboardPage() {
                         </td>
                         <td>{t.outlet ?? "—"}</td>
                         <td>{t.area ?? "—"}</td>
+                        <td>{t.category ?? "—"}</td>
                         <td>{t.pic_name}</td>
                         <td>{fmtDeadline(t.deadline)}</td>
                         <td>
@@ -215,10 +160,32 @@ export default function DashboardPage() {
         ) : null}
       </div>
 
-      <p className="footnote">
-        v1 tidak terpengaruh — halaman ini murni membaca REST API v2 (<code>/api/dashboard/summary</code>,{" "}
-        <code>/api/tasks</code>).
-      </p>
+      <div className="pager">
+        <span className="pager-info">
+          {from}–{to} dari {total}
+        </span>
+        <div className="pager-btns">
+          <button
+            type="button"
+            className="btn"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            ← Sebelumnya
+          </button>
+          <span className="pager-info">
+            Hal {page} / {totalPages}
+          </span>
+          <button
+            type="button"
+            className="btn"
+            disabled={page >= totalPages || loading}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >
+            Berikutnya →
+          </button>
+        </div>
+      </div>
     </main>
   )
 }

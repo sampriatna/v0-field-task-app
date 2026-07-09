@@ -16,6 +16,9 @@ export default function Home() {
             <Link href="/dashboard">Dashboard v2</Link> — ringkasan tugas &amp; checklist
           </li>
           <li>
+            <Link href="/tasks">Daftar Tugas</Link> — list lengkap + filter + detail
+          </li>
+          <li>
             <a href="/api/health">/api/health</a> — health check + koneksi DB
           </li>
         </ul>
