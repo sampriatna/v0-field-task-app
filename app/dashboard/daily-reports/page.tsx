@@ -25,6 +25,7 @@ import {
   Image as ImageIcon,
   ExternalLink,
   CheckCircle2,
+  MessageCircle,
 } from "lucide-react";
 import { getDailyReportDashboard, getStaff, getReportTemplates, syncDailyReportStaff } from "@/lib/api";
 import { outlets } from "@/lib/mock-data";
@@ -39,6 +40,7 @@ import type {
 } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { buildKendalaWaMessage, buildWaMeLink } from "@/lib/wa-message";
 
 function todayLocal(): string {
   const d = new Date();
@@ -421,7 +423,11 @@ export default function DailyReportsDashboardPage() {
                   </thead>
                   <tbody>
                     {rows.map((row) => (
-                      <RowDesktop key={`${row.staff_id}-${row.report_template_id}`} row={row} />
+                      <RowDesktop
+                        key={`${row.staff_id}-${row.report_template_id}`}
+                        row={row}
+                        staffList={staffList}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -429,7 +435,11 @@ export default function DailyReportsDashboardPage() {
 
               <div className="md:hidden space-y-3">
                 {rows.map((row) => (
-                  <RowMobile key={`${row.staff_id}-${row.report_template_id}`} row={row} />
+                  <RowMobile
+                    key={`${row.staff_id}-${row.report_template_id}`}
+                    row={row}
+                    staffList={staffList}
+                  />
                 ))}
               </div>
             </>
@@ -440,8 +450,54 @@ export default function DailyReportsDashboardPage() {
   );
 }
 
-function RowDesktop({ row }: { row: DailyReportDashboardRow }) {
+function leaderWaLinks(row: DailyReportDashboardRow, staffList: Staff[]) {
+  if (!row.submitted || !row.status_condition || row.status_condition === "aman") {
+    return [];
+  }
+  const leaders = staffList.filter(
+    (s) =>
+      s.status === "ACTIVE" &&
+      (s.role === "LEADER" || s.role === "ADMIN") &&
+      s.outlet === row.outlet &&
+      s.wa_number
+  );
+  const fallback =
+    leaders.length > 0
+      ? leaders
+      : staffList.filter(
+          (s) =>
+            s.status === "ACTIVE" &&
+            (s.role === "LEADER" || s.role === "ADMIN") &&
+            s.wa_number
+        );
+
+  const message = buildKendalaWaMessage({
+    staff_name: row.staff_name,
+    outlet: row.outlet,
+    position: row.position,
+    activity_title: row.report_title,
+    status_condition: row.status_condition,
+    note: row.note || "",
+    checklist_summary: `${row.checklist_checked}/${row.checklist_total}`,
+  });
+
+  return fallback
+    .map((l) => ({
+      name: l.name,
+      href: buildWaMeLink(l.wa_number, message),
+    }))
+    .filter((l) => l.href);
+}
+
+function RowDesktop({
+  row,
+  staffList,
+}: {
+  row: DailyReportDashboardRow;
+  staffList: Staff[];
+}) {
   const meta = labelMeta(row.label);
+  const waLinks = leaderWaLinks(row, staffList);
   return (
     <tr
       className={cn(
@@ -467,7 +523,23 @@ function RowDesktop({ row }: { row: DailyReportDashboardRow }) {
           : "—"}
       </td>
       <td className="p-3 whitespace-nowrap">{formatTime(row.submitted_at)}</td>
-      <td className="p-3">{conditionLabel(row.status_condition)}</td>
+      <td className="p-3">
+        <div className="space-y-1">
+          <div>{conditionLabel(row.status_condition)}</div>
+          {waLinks.slice(0, 1).map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:underline"
+            >
+              <MessageCircle className="h-3 w-3" />
+              WA {l.name}
+            </a>
+          ))}
+        </div>
+      </td>
       <td className="p-3">
         {row.photo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -490,8 +562,15 @@ function RowDesktop({ row }: { row: DailyReportDashboardRow }) {
   );
 }
 
-function RowMobile({ row }: { row: DailyReportDashboardRow }) {
+function RowMobile({
+  row,
+  staffList,
+}: {
+  row: DailyReportDashboardRow;
+  staffList: Staff[];
+}) {
   const meta = labelMeta(row.label);
+  const waLinks = leaderWaLinks(row, staffList);
   return (
     <Card
       className={cn(
@@ -546,6 +625,18 @@ function RowMobile({ row }: { row: DailyReportDashboardRow }) {
             Lihat foto
           </a>
         )}
+        {waLinks.map((l) => (
+          <a
+            key={l.href}
+            href={l.href}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-center gap-2 w-full h-11 rounded-xl bg-[#25D366] text-white font-semibold text-sm"
+          >
+            <MessageCircle className="h-4 w-4" />
+            WA Leader {l.name}
+          </a>
+        ))}
       </CardContent>
     </Card>
   );

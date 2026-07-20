@@ -27,6 +27,7 @@ import type {
   StaffReportLinkContext,
   DailyReportFilters,
   DailyReportDashboardData,
+  KendalaNotifyInfo,
 } from "./types";
 import { 
   mockTasks, 
@@ -1392,14 +1393,59 @@ export async function getStaffReportByToken(
   return callStaffReportApi(`/by-token/${encodeURIComponent(token)}`);
 }
 
-/** Public: submit daily report — staff_id taken from token server-side */
+/** Public: submit daily report — staff_id from token; returns notify if kendala */
 export async function submitDailyReport(
   payload: SubmitDailyReportPayload
-): Promise<ApiResponse<DailyReportSubmission>> {
-  return callStaffReportApi("/submit", {
+): Promise<ApiResponse<DailyReportSubmission> & { notify?: KendalaNotifyInfo | null }> {
+  return callStaffReportApiWithNotify<DailyReportSubmission>("/submit", {
     method: "POST",
     body: payload as unknown as Record<string, unknown>,
   });
+}
+
+async function callStaffReportApiWithNotify<T>(
+  path: string,
+  options?: { method?: "GET" | "POST" | "PUT"; body?: Record<string, unknown> }
+): Promise<ApiResponse<T> & { notify?: KendalaNotifyInfo | null }> {
+  try {
+    const method = options?.method || "GET";
+    const response = await fetch(`/api/staff-reports${path}`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: options?.body ? JSON.stringify(options.body) : undefined,
+    });
+
+    if (response.status === 413) {
+      return {
+        success: false,
+        error: "Foto terlalu besar untuk dikirim. Coba ambil ulang foto, lalu kirim lagi.",
+      };
+    }
+
+    const text = await response.text();
+    let result: ApiResponse<T> & { notify?: KendalaNotifyInfo | null };
+    try {
+      result = JSON.parse(text);
+    } catch {
+      return { success: false, error: "Server mengembalikan respons yang tidak valid." };
+    }
+
+    if (!result.success && result.error) {
+      return { success: false, error: result.error };
+    }
+    return {
+      success: Boolean(result.success),
+      data: result.data as T,
+      error: result.error,
+      notify: result.notify ?? null,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menghubungi server",
+    };
+  }
 }
 
 export async function getStaffReportLinks(): Promise<ApiResponse<StaffReportLink[]>> {

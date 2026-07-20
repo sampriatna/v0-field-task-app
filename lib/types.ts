@@ -472,6 +472,20 @@ export interface SubmitDailyReportPayload {
   checklist_answers: { checklist_item_id: string; checked: boolean }[];
 }
 
+export interface KendalaNotifyInfo {
+  needed: boolean;
+  gas_sent: boolean;
+  gas_error?: string;
+  leaders: {
+    staff_id: string;
+    name: string;
+    wa_number: string;
+    outlet: string;
+    wa_link: string;
+  }[];
+  message: string;
+}
+
 export interface StaffReportLinkContext {
   link: StaffReportLink;
   staff: {

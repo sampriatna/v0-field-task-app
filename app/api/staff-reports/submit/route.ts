@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { submitDailyReport } from "@/lib/staff-report-store";
+import { notifyLeadersOnKendala } from "@/lib/wa-notify-daily-report";
 import type { ReportConditionStatus } from "@/lib/types";
 
 /**
- * Public submit — sat set. Tidak menunggu GAS.
- * staff_id selalu dari token.
+ * Public submit — sat set.
+ * Jika status kendala → notifikasi Leader (GAS bila ada + wa.me fallback).
  */
 export async function POST(request: Request) {
   try {
@@ -51,7 +52,32 @@ export async function POST(request: Request) {
       return NextResponse.json(result, { status: 400 });
     }
 
-    return NextResponse.json(result);
+    const submission = result.data;
+    let notify = null;
+
+    if (statusCondition !== "aman") {
+      notify = await notifyLeadersOnKendala({
+        staff_name: submission.staff_name || "Staff",
+        staff_id: submission.staff_id,
+        outlet: submission.outlet || submission.outlet_id,
+        position: submission.position || "",
+        activity_title: submission.report_title || "Kegiatan",
+        status_condition: statusCondition,
+        note: submission.note || "",
+        checklist_summary:
+          submission.checklist_total != null
+            ? `${submission.checklist_checked}/${submission.checklist_total}`
+            : undefined,
+        report_date: submission.report_date,
+        submission_id: submission.id,
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: submission,
+      notify,
+    });
   } catch {
     return NextResponse.json(
       { success: false, error: "Invalid request body" },

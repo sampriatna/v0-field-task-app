@@ -16,12 +16,14 @@ import {
   Clock,
   Target,
   ChevronLeft,
+  MessageCircle,
 } from "lucide-react";
 import { getStaffReportByToken, submitDailyReport } from "@/lib/api";
 import type {
   ReportTemplate,
   DailyReportSubmission,
   ReportConditionStatus,
+  KendalaNotifyInfo,
 } from "@/lib/types";
 import { REPORT_CONDITION_OPTIONS } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -43,6 +45,7 @@ export default function StaffStaticReportPage() {
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [todaySubmissions, setTodaySubmissions] = useState<DailyReportSubmission[]>([]);
   const [flashOk, setFlashOk] = useState<string | null>(null);
+  const [kendalaNotify, setKendalaNotify] = useState<KendalaNotifyInfo | null>(null);
 
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
   const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>({});
@@ -185,9 +188,14 @@ export default function StaffStaticReportPage() {
           return [...rest, result.data!];
         });
         setFlashOk(selectedTemplate.title);
+        if (result.notify?.needed) {
+          setKendalaNotify(result.notify);
+        } else {
+          setKendalaNotify(null);
+        }
         setSelectedTemplate(null);
         setPageState("list");
-        setTimeout(() => setFlashOk(null), 2500);
+        setTimeout(() => setFlashOk(null), 4000);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         setPageState("form");
@@ -313,6 +321,9 @@ export default function StaffStaticReportPage() {
 
           <div className="space-y-2">
             <h2 className="font-semibold text-slate-900">Status kondisi</h2>
+            <p className="text-xs text-slate-500">
+              Jika bukan Aman, sistem hubungi Leader (WA otomatis / tombol chat).
+            </p>
             <div className="grid grid-cols-1 gap-2">
               {REPORT_CONDITION_OPTIONS.map((opt) => (
                 <button
@@ -470,6 +481,46 @@ export default function StaffStaticReportPage() {
           <div className="flex items-center gap-2 bg-emerald-100 border border-emerald-200 text-emerald-900 rounded-xl px-4 py-3 text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-200">
             <CheckCircle2 className="h-5 w-5 shrink-0" />
             {flashOk} terkirim
+          </div>
+        )}
+
+        {kendalaNotify?.needed && (
+          <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3 animate-in fade-in duration-200">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
+              <div className="text-sm text-amber-950">
+                <p className="font-bold">Kendala tercatat</p>
+                {kendalaNotify.gas_sent ? (
+                  <p>Leader sudah dikirimi WA otomatis.</p>
+                ) : kendalaNotify.leaders.length > 0 ? (
+                  <p>Ketuk tombol di bawah untuk hubungi Leader via WhatsApp.</p>
+                ) : (
+                  <p>
+                    Belum ada nomor Leader di outlet ini. Minta admin isi role LEADER + WA di
+                    Master Staff.
+                  </p>
+                )}
+              </div>
+            </div>
+            {kendalaNotify.leaders.map((leader) => (
+              <a
+                key={leader.staff_id}
+                href={leader.wa_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full h-14 rounded-xl bg-[#25D366] text-white font-bold text-base active:scale-[0.98] transition-transform shadow-sm"
+              >
+                <MessageCircle className="h-5 w-5" />
+                WA {leader.name}
+              </a>
+            ))}
+            <button
+              type="button"
+              className="text-xs text-amber-800 underline w-full text-center"
+              onClick={() => setKendalaNotify(null)}
+            >
+              Tutup
+            </button>
           </div>
         )}
 

@@ -121,6 +121,30 @@ const seedStaff: Staff[] = [
     created_at: nowISO(),
     updated_at: nowISO(),
   },
+  {
+    staff_id: "STF-L01",
+    name: "Leader KBU",
+    position: "Leader",
+    outlet: "KBU",
+    area: "Floor",
+    wa_number: "6281110001001",
+    role: "LEADER",
+    status: "ACTIVE",
+    created_at: nowISO(),
+    updated_at: nowISO(),
+  },
+  {
+    staff_id: "STF-L02",
+    name: "Leader Kisamen",
+    position: "Leader",
+    outlet: "Kisamen",
+    area: "Bar",
+    wa_number: "6281110001002",
+    role: "LEADER",
+    status: "ACTIVE",
+    created_at: nowISO(),
+    updated_at: nowISO(),
+  },
 ];
 
 type SeedDef = {
