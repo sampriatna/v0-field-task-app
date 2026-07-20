@@ -16,6 +16,9 @@ import {
   ChevronRight,
   RepeatIcon,
   ShieldCheck,
+  Link2,
+  FileText,
+  ClipboardList,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
@@ -142,6 +145,66 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
+          </Card>
+        </Link>
+
+        {/* Link Report Staff */}
+        <Link href="/settings/report-links">
+          <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <Link2 className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Link Report Staff</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Generate link permanen /r/[token] untuk laporan harian cepat
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </Card>
+        </Link>
+
+        {/* Template Report Harian */}
+        <Link href="/settings/report-templates">
+          <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Template Report Harian</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Jenis report per outlet & jabatan (wajib foto / wajib harian)
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </Card>
+        </Link>
+
+        {/* Daily Report Dashboard shortcut */}
+        <Link href="/dashboard/daily-reports">
+          <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <ClipboardList className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Dashboard Daily Report</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Lihat siapa sudah/belum submit laporan hari ini
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
           </Card>
         </Link>
 

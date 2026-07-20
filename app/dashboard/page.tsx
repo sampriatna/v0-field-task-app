@@ -381,6 +381,22 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </Link>
+          <Link href="/dashboard/daily-reports" className="col-span-2">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <ClipboardList className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground text-sm">Daily Report Staff</p>
+                  <p className="text-xs text-muted-foreground">
+                    Laporan harian via link permanen — pelengkap task
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Tabs */}

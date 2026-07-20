@@ -485,6 +485,84 @@ async function migrateTasks(sheetRows: Record<string, string>[]) {
 
 ---
 
+## Fitur Baru: Staff Static Report Link (Daily Report)
+
+Pelengkap sistem task utama. Staff membuka link permanen `/r/[token]` tanpa login penuh untuk kirim laporan harian.
+
+### Tabel: `staff_report_links`
+
+```sql
+CREATE TABLE staff_report_links (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  staff_id    VARCHAR(50) NOT NULL REFERENCES staff(staff_id),
+  token       VARCHAR(128) NOT NULL UNIQUE,  -- random 64+ hex chars
+  is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  revoked_at  TIMESTAMPTZ
+);
+
+CREATE INDEX idx_staff_report_links_token ON staff_report_links(token) WHERE is_active = TRUE;
+CREATE INDEX idx_staff_report_links_staff ON staff_report_links(staff_id);
+```
+
+### Tabel: `report_templates`
+
+```sql
+CREATE TABLE report_templates (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  outlet_id          UUID REFERENCES outlets(id),       -- NULL = semua outlet
+  position_group     VARCHAR(100),                      -- NULL = semua jabatan
+  title              VARCHAR(200) NOT NULL,
+  description        TEXT,
+  requires_photo     BOOLEAN NOT NULL DEFAULT FALSE,
+  is_required_daily  BOOLEAN NOT NULL DEFAULT FALSE,
+  active             BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order         INT NOT NULL DEFAULT 10,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_report_templates_active ON report_templates(active, sort_order);
+```
+
+### Tabel: `daily_report_submissions`
+
+```sql
+CREATE TABLE daily_report_submissions (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  staff_id            VARCHAR(50) NOT NULL REFERENCES staff(staff_id),
+  outlet_id           UUID NOT NULL REFERENCES outlets(id),
+  report_template_id  UUID NOT NULL REFERENCES report_templates(id),
+  report_date         DATE NOT NULL,
+  note                TEXT,
+  photo_url           TEXT,
+  status              VARCHAR(30) NOT NULL DEFAULT 'submitted', -- submitted | issue | reviewed
+  submitted_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(staff_id, report_template_id, report_date)
+);
+
+CREATE INDEX idx_daily_reports_date ON daily_report_submissions(report_date);
+CREATE INDEX idx_daily_reports_outlet_date ON daily_report_submissions(outlet_id, report_date);
+CREATE INDEX idx_daily_reports_staff_date ON daily_report_submissions(staff_id, report_date);
+```
+
+**Security rules:**
+- Token harus random panjang; bisa di-revoke (`is_active = false`).
+- Submit menolak token nonaktif.
+- `staff_id` selalu diambil dari token, bukan dari input client.
+- Template hanya yang match outlet + position_group staff.
+
+**API routes (Next.js):**
+- `GET /api/staff-reports/by-token/:token` (public)
+- `POST /api/staff-reports/submit` (public, token in body)
+- `GET|POST /api/staff-reports/links` (admin)
+- `POST /api/staff-reports/links/:id/revoke` (admin)
+- `GET|POST /api/staff-reports/templates` (admin)
+- `PUT /api/staff-reports/templates/:id` (admin)
+- `GET /api/staff-reports/dashboard` (admin)
+
+---
+
 ## Backup & Retention
 
 | Data | Retention | Backup |
@@ -494,3 +572,4 @@ async function migrateTasks(sheetRows: Record<string, string>[]) {
 | Audit logs | 2 tahun | Weekly |
 | Sync logs | 90 hari | Tidak perlu arsip |
 | Foto | Selamanya | Replicate ke secondary bucket |
+| Daily report submissions | 2 tahun | Weekly |

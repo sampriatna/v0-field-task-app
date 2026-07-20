@@ -22,8 +22,11 @@ const PUBLIC_ROUTES = [
   "/login",
   "/report/", // /report/[taskId]?token=...
   "/checklist/", // /checklist/[taskId]?token=... - staff view
+  "/r/", // /r/[token] - staff static daily report link
   "/api/auth/",
   "/api/gas", // Will be secured at the API level
+  "/api/staff-reports/by-token/", // public token lookup
+  "/api/staff-reports/submit", // public daily report submit
 ];
 
 function isProtectedRoute(pathname: string): boolean {
