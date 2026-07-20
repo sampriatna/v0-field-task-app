@@ -28,6 +28,7 @@ import {
   getStaffReportLinks,
   generateStaffReportLink,
   revokeStaffReportLink,
+  syncDailyReportStaff,
 } from "@/lib/api";
 import type { Staff, StaffReportLink } from "@/lib/types";
 import { Link2, Copy, RefreshCw, Ban, Check } from "lucide-react";
@@ -45,11 +46,12 @@ export default function ReportLinksSettingsPage() {
   const load = async () => {
     setIsLoading(true);
     try {
-      const [staffRes, linksRes] = await Promise.all([
-        getStaff({ status: "ACTIVE" }),
-        getStaffReportLinks(),
-      ]);
-      if (staffRes.success && staffRes.data) setStaffList(staffRes.data);
+      const staffRes = await getStaff({ status: "ACTIVE" });
+      if (staffRes.success && staffRes.data) {
+        setStaffList(staffRes.data);
+        await syncDailyReportStaff(staffRes.data);
+      }
+      const linksRes = await getStaffReportLinks();
       if (linksRes.success && linksRes.data) setLinks(linksRes.data);
     } catch {
       toast({
@@ -79,7 +81,9 @@ export default function ReportLinksSettingsPage() {
     }
     setIsWorking(true);
     try {
-      const result = await generateStaffReportLink(selectedStaffId);
+      // Pastikan store punya staff terbaru sebelum generate
+      if (staffList.length > 0) await syncDailyReportStaff(staffList);
+      const result = await generateStaffReportLink(selectedStaffId, staffList);
       if (result.success && result.data) {
         toast({ title: "Link dibuat", description: "Link report permanen siap dibagikan" });
         setSelectedStaffId("");

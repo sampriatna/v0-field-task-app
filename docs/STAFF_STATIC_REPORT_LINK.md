@@ -1,41 +1,57 @@
-# Staff Static Report Link
+# Staff Static Report Link — Kegiatan Standar (SOP)
 
-Fitur pelengkap daily report cepat untuk Nusa Food. **Tidak mengganti sistem task utama.**
+Fitur pelengkap daily report. **Bukan laporan teks bebas.** Staff mengikuti standar kerja: checklist + foto + status kondisi.
 
-## Ringkas
+## Dua lapisan (wajib dipisah)
 
-1. Admin generate link permanen per staff → `/r/[token]`
-2. Staff buka link tanpa login penuh
-3. Pilih template report (filter outlet + jabatan), isi catatan, upload foto bila perlu
-4. Submit → `daily_report_submissions`
-5. Admin lihat di `/dashboard/daily-reports`
+| Lapisan | Untuk apa | Cara kerja |
+|---------|-----------|------------|
+| **Task lama** | Pekerjaan yang diberikan admin/leader | Deadline, revisi, approval, foto before-after, WA |
+| **Daily Activity SOP** | Kegiatan standar harian per SDM | Link pribadi `/r/[token]`, checklist, foto, submit — tanpa WA tiap hari |
+
+Fitur baru **bukan pengganti** task lama.
+
+## Prinsip
+
+Staff jangan dikasih kolom kosong. Staff dikasih standar kerja → centang → audit.
+
+## Performa (sat set)
+
+- Public `/r/[token]` & submit **tidak menunggu GAS**
+- Buka form kegiatan = instan (tanpa network)
+- Setelah submit: update lokal + flash OK (tidak reload penuh)
+- Feedback klik: `active:scale`, spinner hanya saat kirim
+- Admin sync staff dari data yang sudah di-fetch client
+
+## Super Admin (editable)
+
+Hub: `/settings/daily-activity`
+
+- Edit template kegiatan + checklist
+- Generate / revoke link staff
+- Dashboard audit
 
 ## Halaman
 
-| Route | Akses | Fungsi |
-|-------|-------|--------|
-| `/r/[token]` | Publik | Form report staff |
-| `/dashboard/daily-reports` | Admin | Dashboard + filter |
-| `/settings/report-links` | Admin | Generate / revoke link |
-| `/settings/report-templates` | Admin | CRUD template |
-| `/settings/staff` | Admin | Tombol generate link per staff |
+| Route | Fungsi |
+|-------|--------|
+| `/r/[token]` | Daftar kegiatan → form checklist SOP |
+| `/dashboard/daily-reports` | Audit: % checklist, kondisi, warna status |
+| `/settings/daily-activity` | Hub super admin |
+| `/settings/report-templates` | CRUD kegiatan + checklist |
+| `/settings/report-links` | Generate / revoke link |
 
-## Demo token (seed lokal)
+## Warna dashboard
 
-Staff Budi (Cook, KBU):
+- **Hijau** — selesai lengkap (Aman)
+- **Kuning** — selesai ada kendala
+- **Merah** — belum submit (wajib)
+- **Abu** — tidak wajib
 
-```
-/r/a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00
-```
+## Demo seed
 
-## Security
-
-- Token: 64 hex chars (`crypto.randomBytes(32)`)
-- Token nonaktif ditolak
-- `staff_id` dari token saja
-- Template divalidasi terhadap outlet & position staff
-
-## Persistensi
-
-Store in-memory (`lib/staff-report-store.ts`) untuk demo/dev.  
-Produksi: migrasi ke PostgreSQL sesuai `docs/V2_DATABASE_SCHEMA.md` (tabel `staff_report_links`, `report_templates`, `daily_report_submissions`).
+| Staff | Posisi | Path |
+|-------|--------|------|
+| Rina | Waiters | `/r/b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff0011` |
+| Ani | Bar | `/r/c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff001122` |
+| Budi | Dapur | `/r/a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00` |

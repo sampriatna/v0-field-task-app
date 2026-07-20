@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
-import { submitDailyReport, setStaffCache } from "@/lib/staff-report-store";
-import { getStaff } from "@/lib/api-server-staff";
+import { submitDailyReport } from "@/lib/staff-report-store";
+import type { ReportConditionStatus } from "@/lib/types";
 
+/**
+ * Public submit — sat set. Tidak menunggu GAS.
+ * staff_id selalu dari token.
+ */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -10,31 +14,37 @@ export async function POST(request: Request) {
     const note = typeof body.note === "string" ? body.note : "";
     const photoBase64 =
       typeof body.photo_base64 === "string" ? body.photo_base64 : undefined;
+    const statusCondition = body.status_condition as ReportConditionStatus;
+    const checklistAnswers = Array.isArray(body.checklist_answers)
+      ? body.checklist_answers.map(
+          (a: { checklist_item_id?: string; checked?: boolean }) => ({
+            checklist_item_id: String(a.checklist_item_id || ""),
+            checked: Boolean(a.checked),
+          })
+        )
+      : [];
 
     if (!token || !reportTemplateId) {
       return NextResponse.json(
-        { success: false, error: "Token dan jenis report wajib diisi" },
+        { success: false, error: "Token dan kegiatan wajib diisi" },
         { status: 400 }
       );
     }
 
-    try {
-      const staffResult = await getStaff();
-      if (staffResult.success && staffResult.data) {
-        setStaffCache(staffResult.data);
-      }
-    } catch {
-      // seed
+    if (!statusCondition) {
+      return NextResponse.json(
+        { success: false, error: "Pilih status kondisi kegiatan" },
+        { status: 400 }
+      );
     }
-
-    // Store photo as data URL for demo; production should upload to Drive/Storage
-    const photoUrl = photoBase64 || null;
 
     const result = submitDailyReport({
       token,
       report_template_id: reportTemplateId,
+      status_condition: statusCondition,
       note,
-      photo_url: photoUrl,
+      photo_url: photoBase64 || null,
+      checklist_answers: checklistAnswers,
     });
 
     if (!result.success) {

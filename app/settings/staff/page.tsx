@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { getStaff, createStaff, updateStaff, deactivateStaff, activateStaff, generateStaffReportLink } from "@/lib/api";
+import { getStaff, createStaff, updateStaff, deactivateStaff, activateStaff, generateStaffReportLink, syncDailyReportStaff } from "@/lib/api";
 import { outlets, areas } from "@/lib/mock-data";
 import type { Staff, CreateStaffPayload, Outlet, Area, StaffRole } from "@/lib/types";
 import { Plus, Pencil, UserX, UserCheck, Search, Users, Phone, Link2 } from "lucide-react";
@@ -223,7 +223,9 @@ export default function StaffMasterPage() {
 
   const handleGenerateReportLink = async (staff: Staff) => {
     try {
-      const result = await generateStaffReportLink(staff.staff_id);
+      const all = staffList.length > 0 ? staffList : [staff];
+      await syncDailyReportStaff(all);
+      const result = await generateStaffReportLink(staff.staff_id, all);
       if (result.success && result.data) {
         const url = result.data.report_url || `${window.location.origin}/r/${result.data.token}`;
         try {

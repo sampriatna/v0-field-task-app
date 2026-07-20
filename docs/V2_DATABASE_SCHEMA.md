@@ -485,9 +485,9 @@ async function migrateTasks(sheetRows: Record<string, string>[]) {
 
 ---
 
-## Fitur Baru: Staff Static Report Link (Daily Report)
+## Fitur Baru: Staff Static Report Link (Daily Report / SOP)
 
-Pelengkap sistem task utama. Staff membuka link permanen `/r/[token]` tanpa login penuh untuk kirim laporan harian.
+Pelengkap sistem task utama. Staff membuka `/r/[token]` untuk mengisi **kegiatan standar** (checklist + foto + kondisi), bukan laporan teks bebas.
 
 ### Tabel: `staff_report_links`
 
@@ -495,7 +495,7 @@ Pelengkap sistem task utama. Staff membuka link permanen `/r/[token]` tanpa logi
 CREATE TABLE staff_report_links (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   staff_id    VARCHAR(50) NOT NULL REFERENCES staff(staff_id),
-  token       VARCHAR(128) NOT NULL UNIQUE,  -- random 64+ hex chars
+  token       VARCHAR(128) NOT NULL UNIQUE,
   is_active   BOOLEAN NOT NULL DEFAULT TRUE,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   revoked_at  TIMESTAMPTZ
@@ -510,18 +510,36 @@ CREATE INDEX idx_staff_report_links_staff ON staff_report_links(staff_id);
 ```sql
 CREATE TABLE report_templates (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  outlet_id          UUID REFERENCES outlets(id),       -- NULL = semua outlet
-  position_group     VARCHAR(100),                      -- NULL = semua jabatan
   title              VARCHAR(200) NOT NULL,
+  category           VARCHAR(50) NOT NULL DEFAULT 'General',
+  outlet_id          UUID REFERENCES outlets(id),
+  position_group     VARCHAR(100),  -- Waiters | Bar | Dapur | NULL=semua
+  standard_result    TEXT NOT NULL,
   description        TEXT,
   requires_photo     BOOLEAN NOT NULL DEFAULT FALSE,
   is_required_daily  BOOLEAN NOT NULL DEFAULT FALSE,
+  kind               VARCHAR(30) NOT NULL DEFAULT 'daily_required', -- daily_required | special_task | issue_quick
+  target_time_start  TIME,
+  target_time_end    TIME,
   active             BOOLEAN NOT NULL DEFAULT TRUE,
   sort_order         INT NOT NULL DEFAULT 10,
   created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+```
 
-CREATE INDEX idx_report_templates_active ON report_templates(active, sort_order);
+### Tabel: `report_template_checklist_items`
+
+```sql
+CREATE TABLE report_template_checklist_items (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  report_template_id  UUID NOT NULL REFERENCES report_templates(id) ON DELETE CASCADE,
+  item_text           VARCHAR(300) NOT NULL,
+  is_required         BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order          INT NOT NULL DEFAULT 1,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_rtci_template ON report_template_checklist_items(report_template_id, sort_order);
 ```
 
 ### Tabel: `daily_report_submissions`
@@ -533,33 +551,31 @@ CREATE TABLE daily_report_submissions (
   outlet_id           UUID NOT NULL REFERENCES outlets(id),
   report_template_id  UUID NOT NULL REFERENCES report_templates(id),
   report_date         DATE NOT NULL,
+  status_condition    VARCHAR(30) NOT NULL, -- aman | kendala_ringan | follow_up_leader | perlu_belanja
   note                TEXT,
   photo_url           TEXT,
-  status              VARCHAR(30) NOT NULL DEFAULT 'submitted', -- submitted | issue | reviewed
   submitted_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(staff_id, report_template_id, report_date)
 );
-
-CREATE INDEX idx_daily_reports_date ON daily_report_submissions(report_date);
-CREATE INDEX idx_daily_reports_outlet_date ON daily_report_submissions(outlet_id, report_date);
-CREATE INDEX idx_daily_reports_staff_date ON daily_report_submissions(staff_id, report_date);
 ```
 
-**Security rules:**
-- Token harus random panjang; bisa di-revoke (`is_active = false`).
-- Submit menolak token nonaktif.
-- `staff_id` selalu diambil dari token, bukan dari input client.
-- Template hanya yang match outlet + position_group staff.
+### Tabel: `daily_report_checklist_answers`
 
-**API routes (Next.js):**
-- `GET /api/staff-reports/by-token/:token` (public)
-- `POST /api/staff-reports/submit` (public, token in body)
-- `GET|POST /api/staff-reports/links` (admin)
-- `POST /api/staff-reports/links/:id/revoke` (admin)
-- `GET|POST /api/staff-reports/templates` (admin)
-- `PUT /api/staff-reports/templates/:id` (admin)
-- `GET /api/staff-reports/dashboard` (admin)
+```sql
+CREATE TABLE daily_report_checklist_answers (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  submission_id       UUID NOT NULL REFERENCES daily_report_submissions(id) ON DELETE CASCADE,
+  checklist_item_id   UUID NOT NULL REFERENCES report_template_checklist_items(id),
+  checked             BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(submission_id, checklist_item_id)
+);
+```
+
+**Security:** token random panjang; revoke menolak submit; `staff_id` dari token; template & checklist divalidasi per staff.
+
+**API:** `/api/staff-reports/*` — lihat `docs/STAFF_STATIC_REPORT_LINK.md`.
 
 ---
 

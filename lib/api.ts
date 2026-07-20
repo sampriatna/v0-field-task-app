@@ -1407,11 +1407,15 @@ export async function getStaffReportLinks(): Promise<ApiResponse<StaffReportLink
 }
 
 export async function generateStaffReportLink(
-  staffId: string
+  staffId: string,
+  staffList?: Staff[]
 ): Promise<ApiResponse<StaffReportLink>> {
   return callStaffReportApi("/links", {
     method: "POST",
-    body: { staff_id: staffId },
+    body: {
+      staff_id: staffId,
+      ...(staffList && staffList.length > 0 ? { staff: staffList } : {}),
+    },
   });
 }
 
@@ -1457,6 +1461,16 @@ export async function getDailyReportDashboard(
   if (filters?.submit_status) params.set("submit_status", filters.submit_status);
   const qs = params.toString();
   return callStaffReportApi(`/dashboard${qs ? `?${qs}` : ""}`);
+}
+
+/** Sync staff master ke store daily-report (cepat, dari data client). */
+export async function syncDailyReportStaff(
+  staff: Staff[]
+): Promise<ApiResponse<{ count: number }>> {
+  return callStaffReportApi("/sync-staff", {
+    method: "POST",
+    body: { staff },
+  });
 }
 
 export function buildStaffStaticReportLink(token: string, origin?: string): string {
