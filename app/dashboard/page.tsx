@@ -388,9 +388,9 @@ export default function DashboardPage() {
                   <ClipboardList className="w-5 h-5 text-emerald-700" />
                 </div>
                 <div>
-                  <p className="font-medium text-foreground text-sm">Daily Report Staff</p>
+                  <p className="font-medium text-foreground text-sm">Daily Activity SOP</p>
                   <p className="text-xs text-muted-foreground">
-                    Laporan harian via link permanen — pelengkap task
+                    Lapisan tambahan — kegiatan harian standar (bukan pengganti task)
                   </p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />

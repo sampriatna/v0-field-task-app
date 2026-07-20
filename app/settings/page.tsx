@@ -148,6 +148,32 @@ export default function SettingsPage() {
           </Card>
         </Link>
 
+        {/* Daily Activity SOP — lapisan tambahan (bukan pengganti task) */}
+        <div className="pt-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 px-1">
+            Daily Activity SOP · lapisan tambahan
+          </p>
+        </div>
+
+        <Link href="/settings/daily-activity">
+          <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer border-emerald-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                  <ClipboardList className="w-5 h-5 text-emerald-700" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Kelola Daily Activity</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Super admin: edit template SOP, link staff, dashboard audit
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </Card>
+        </Link>
+
         {/* Link Report Staff */}
         <Link href="/settings/report-links">
           <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer">
@@ -199,7 +225,7 @@ export default function SettingsPage() {
                 <div>
                   <h3 className="font-semibold text-foreground">Dashboard Daily Report</h3>
                   <p className="text-sm text-muted-foreground">
-                    Lihat siapa sudah/belum submit laporan hari ini
+                    Lihat siapa sudah/belum submit kegiatan hari ini
                   </p>
                 </div>
               </div>

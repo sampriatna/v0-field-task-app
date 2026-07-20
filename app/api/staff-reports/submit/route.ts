@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
-import { submitDailyReport, setStaffCache } from "@/lib/staff-report-store";
-import { getStaff } from "@/lib/api-server-staff";
+import { submitDailyReport } from "@/lib/staff-report-store";
 import type { ReportConditionStatus } from "@/lib/types";
 
+/**
+ * Public submit — sat set. Tidak menunggu GAS.
+ * staff_id selalu dari token.
+ */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -33,15 +36,6 @@ export async function POST(request: Request) {
         { success: false, error: "Pilih status kondisi kegiatan" },
         { status: 400 }
       );
-    }
-
-    try {
-      const staffResult = await getStaff();
-      if (staffResult.success && staffResult.data) {
-        setStaffCache(staffResult.data);
-      }
-    } catch {
-      // seed
     }
 
     const result = submitDailyReport({

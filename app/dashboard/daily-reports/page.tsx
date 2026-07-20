@@ -26,7 +26,7 @@ import {
   ExternalLink,
   CheckCircle2,
 } from "lucide-react";
-import { getDailyReportDashboard, getStaff, getReportTemplates } from "@/lib/api";
+import { getDailyReportDashboard, getStaff, getReportTemplates, syncDailyReportStaff } from "@/lib/api";
 import { outlets } from "@/lib/mock-data";
 import type {
   DailyReportDashboardData,
@@ -103,7 +103,14 @@ export default function DailyReportsDashboardPage() {
       if (refresh) setIsRefreshing(true);
       else setIsLoading(true);
       try {
-        const [dash, staffRes, tplRes] = await Promise.all([
+        // Sync staff dulu (data client) — dashboard tidak nunggu GAS
+        const staffRes = await getStaff({ status: "ACTIVE" });
+        if (staffRes.success && staffRes.data) {
+          setStaffList(staffRes.data);
+          await syncDailyReportStaff(staffRes.data);
+        }
+
+        const [dash, tplRes] = await Promise.all([
           getDailyReportDashboard({
             date,
             outlet: outlet === "ALL" ? undefined : outlet,
@@ -111,7 +118,6 @@ export default function DailyReportsDashboardPage() {
             report_template_id: templateId === "ALL" ? undefined : templateId,
             submit_status: submitStatus,
           }),
-          getStaff({ status: "ACTIVE" }),
           getReportTemplates(),
         ]);
 
@@ -123,7 +129,6 @@ export default function DailyReportsDashboardPage() {
             variant: "destructive",
           });
         }
-        if (staffRes.success && staffRes.data) setStaffList(staffRes.data);
         if (tplRes.success && tplRes.data) setTemplates(tplRes.data);
       } catch {
         toast({ title: "Error", description: "Gagal memuat data", variant: "destructive" });
@@ -152,7 +157,7 @@ export default function DailyReportsDashboardPage() {
           <div>
             <h2 className="font-semibold text-foreground">Kegiatan Standar Staff</h2>
             <p className="text-sm text-muted-foreground">
-              Checklist + foto + status kondisi — bukan laporan teks bebas
+              Lapisan tambahan di atas Task — checklist + foto + kondisi (bukan pengganti task WA)
             </p>
           </div>
           <div className="flex gap-2">
@@ -348,15 +353,23 @@ export default function DailyReportsDashboardPage() {
           </Card>
         )}
 
-        <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap">
+          <Link href="/settings/daily-activity">
+            <Button variant="outline" size="sm">
+              Super Admin Hub
+              <ExternalLink className="h-3.5 w-3.5 ml-1" />
+            </Button>
+          </Link>
           <Link href="/settings/report-links">
             <Button variant="outline" size="sm">
-              Kelola Link Staff <ExternalLink className="h-3.5 w-3.5 ml-1" />
+              Kelola Link Staff
+              <ExternalLink className="h-3.5 w-3.5 ml-1" />
             </Button>
           </Link>
           <Link href="/settings/report-templates">
             <Button variant="outline" size="sm">
-              Template Kegiatan <ExternalLink className="h-3.5 w-3.5 ml-1" />
+              Edit Template
+              <ExternalLink className="h-3.5 w-3.5 ml-1" />
             </Button>
           </Link>
         </div>

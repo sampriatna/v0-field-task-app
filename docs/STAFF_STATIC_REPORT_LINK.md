@@ -2,23 +2,34 @@
 
 Fitur pelengkap daily report. **Bukan laporan teks bebas.** Staff mengikuti standar kerja: checklist + foto + status kondisi.
 
+## Dua lapisan (wajib dipisah)
+
+| Lapisan | Untuk apa | Cara kerja |
+|---------|-----------|------------|
+| **Task lama** | Pekerjaan yang diberikan admin/leader | Deadline, revisi, approval, foto before-after, WA |
+| **Daily Activity SOP** | Kegiatan standar harian per SDM | Link pribadi `/r/[token]`, checklist, foto, submit — tanpa WA tiap hari |
+
+Fitur baru **bukan pengganti** task lama.
+
 ## Prinsip
 
 Staff jangan dikasih kolom kosong. Staff dikasih standar kerja → centang → audit.
 
-Setiap kegiatan punya:
-1. Nama kegiatan
-2. Standar hasil
-3. Checklist kerja
-4. Bukti foto (jika wajib)
-5. Status kondisi (Aman / Kendala ringan / Follow up leader / Perlu belanja)
-6. Catatan kendala (tambahan; wajib hanya jika bukan Aman)
+## Performa (sat set)
 
-## Jenis report
+- Public `/r/[token]` & submit **tidak menunggu GAS**
+- Buka form kegiatan = instan (tanpa network)
+- Setelah submit: update lokal + flash OK (tidak reload penuh)
+- Feedback klik: `active:scale`, spinner hanya saat kirim
+- Admin sync staff dari data yang sudah di-fetch client
 
-1. **Wajib harian** — muncul otomatis per `position_group` (Waiters / Bar / Dapur)
-2. **Pekerjaan khusus** — template non-daily / special
-3. **Lapor kendala** — tombol cepat (`kind: issue_quick`)
+## Super Admin (editable)
+
+Hub: `/settings/daily-activity`
+
+- Edit template kegiatan + checklist
+- Generate / revoke link staff
+- Dashboard audit
 
 ## Halaman
 
@@ -26,28 +37,21 @@ Setiap kegiatan punya:
 |-------|--------|
 | `/r/[token]` | Daftar kegiatan → form checklist SOP |
 | `/dashboard/daily-reports` | Audit: % checklist, kondisi, warna status |
-| `/settings/report-templates` | CRUD kegiatan + checklist items |
-| `/settings/report-links` | Generate / revoke link permanen |
+| `/settings/daily-activity` | Hub super admin |
+| `/settings/report-templates` | CRUD kegiatan + checklist |
+| `/settings/report-links` | Generate / revoke link |
 
 ## Warna dashboard
 
 - **Hijau** — selesai lengkap (Aman)
 - **Kuning** — selesai ada kendala
 - **Merah** — belum submit (wajib)
-- **Abu** — tidak wajib untuk posisi itu
+- **Abu** — tidak wajib
 
-## Demo seed links
+## Demo seed
 
-| Staff | Posisi | Token path |
-|-------|--------|------------|
-| Budi | Cook → Dapur | `/r/a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00` |
-| Rina | Server → Waiters | `/r/b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff0011` |
-| Ani | Barista → Bar | `/r/c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff001122` |
-
-## Schema (PostgreSQL)
-
-Lihat `docs/V2_DATABASE_SCHEMA.md`:
-- `report_templates`
-- `report_template_checklist_items`
-- `daily_report_submissions` (`status_condition`)
-- `daily_report_checklist_answers`
+| Staff | Posisi | Path |
+|-------|--------|------|
+| Rina | Waiters | `/r/b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff0011` |
+| Ani | Bar | `/r/c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff001122` |
+| Budi | Dapur | `/r/a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00` |

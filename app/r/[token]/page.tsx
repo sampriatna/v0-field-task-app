@@ -1,22 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { PhotoUploader } from "@/components/photo-uploader";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   CheckCircle2,
   AlertTriangle,
   Send,
   MapPin,
   Briefcase,
-  User,
   Camera,
   ClipboardList,
   Clock,
   Target,
+  ChevronLeft,
 } from "lucide-react";
 import { getStaffReportByToken, submitDailyReport } from "@/lib/api";
 import type {
@@ -32,6 +31,8 @@ type PageState = "loading" | "error" | "list" | "form" | "submitting" | "success
 export default function StaffStaticReportPage() {
   const params = useParams();
   const token = (params.token as string) || "";
+  const [, startTransition] = useTransition();
+  const formTopRef = useRef<HTMLDivElement>(null);
 
   const [pageState, setPageState] = useState<PageState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
@@ -41,6 +42,7 @@ export default function StaffStaticReportPage() {
   const [positionGroup, setPositionGroup] = useState("");
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [todaySubmissions, setTodaySubmissions] = useState<DailyReportSubmission[]>([]);
+  const [flashOk, setFlashOk] = useState<string | null>(null);
 
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
   const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>({});
@@ -49,37 +51,41 @@ export default function StaffStaticReportPage() {
   const [photo, setPhoto] = useState<string | undefined>();
 
   useEffect(() => {
-    loadContext();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  const loadContext = async () => {
     if (!token) {
       setErrorMessage("Link tidak valid.\nHubungi atasan Anda.");
       setPageState("error");
       return;
     }
 
-    setPageState("loading");
-    try {
-      const result = await getStaffReportByToken(token);
-      if (result.success && result.data) {
-        setStaffName(result.data.staff.name);
-        setOutlet(result.data.staff.outlet);
-        setPosition(result.data.staff.position);
-        setPositionGroup(result.data.staff.position_group);
-        setTemplates(result.data.templates);
-        setTodaySubmissions(result.data.today_submissions || []);
-        setPageState("list");
-      } else {
-        setErrorMessage(result.error || "Link tidak valid.\nHubungi atasan Anda.");
-        setPageState("error");
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await getStaffReportByToken(token);
+        if (cancelled) return;
+        if (result.success && result.data) {
+          setStaffName(result.data.staff.name);
+          setOutlet(result.data.staff.outlet);
+          setPosition(result.data.staff.position);
+          setPositionGroup(result.data.staff.position_group);
+          setTemplates(result.data.templates);
+          setTodaySubmissions(result.data.today_submissions || []);
+          setPageState("list");
+        } else {
+          setErrorMessage(result.error || "Link tidak valid.\nHubungi atasan Anda.");
+          setPageState("error");
+        }
+      } catch {
+        if (!cancelled) {
+          setErrorMessage("Gagal memuat data.\nPeriksa koneksi internet Anda.");
+          setPageState("error");
+        }
       }
-    } catch {
-      setErrorMessage("Gagal memuat data.\nPeriksa koneksi internet Anda.");
-      setPageState("error");
-    }
-  };
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   const requiredTemplates = useMemo(
     () => templates.filter((t) => t.is_required_daily),
@@ -94,44 +100,56 @@ export default function StaffStaticReportPage() {
     todaySubmissions.find((s) => s.report_template_id === templateId);
 
   const openForm = (template: ReportTemplate) => {
-    setSelectedTemplate(template);
+    // Instant — no network
     const existing = alreadySubmitted(template.id);
     const initial: Record<string, boolean> = {};
     for (const item of template.checklist_items || []) {
-      const prev = existing?.checklist_answers?.find(
-        (a) => a.checklist_item_id === item.id
-      );
+      const prev = existing?.checklist_answers?.find((a) => a.checklist_item_id === item.id);
       initial[item.id] = Boolean(prev?.checked);
     }
-    setCheckedMap(initial);
-    setStatusCondition(existing?.status_condition || "");
-    setNote(existing?.note || "");
-    setPhoto(existing?.photo_url || undefined);
-    setPageState("form");
+    startTransition(() => {
+      setSelectedTemplate(template);
+      setCheckedMap(initial);
+      setStatusCondition(existing?.status_condition || "");
+      setNote(existing?.note || "");
+      setPhoto(existing?.photo_url || undefined);
+      setPageState("form");
+    });
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    });
+  };
+
+  const backToList = () => {
+    startTransition(() => {
+      setSelectedTemplate(null);
+      setPageState("list");
+    });
+  };
+
+  const toggleCheck = (id: string) => {
+    setCheckedMap((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
   const checkedCount = selectedTemplate
     ? (selectedTemplate.checklist_items || []).filter((i) => checkedMap[i.id]).length
     : 0;
   const totalCount = selectedTemplate?.checklist_items?.length || 0;
-
   const conditionNeedsNote =
     statusCondition &&
     REPORT_CONDITION_OPTIONS.find((o) => o.value === statusCondition)?.requiresNote;
 
   const handleSubmit = async () => {
-    if (!selectedTemplate) return;
+    if (!selectedTemplate || pageState === "submitting") return;
 
     if (!statusCondition) {
       alert("PILIH STATUS KONDISI");
       return;
     }
-
     if (selectedTemplate.requires_photo && !photo) {
       alert("HARAP UPLOAD FOTO BUKTI");
       return;
     }
-
     if (conditionNeedsNote && !note.trim()) {
       alert("ISI CATATAN KENDALA");
       return;
@@ -158,8 +176,19 @@ export default function StaffStaticReportPage() {
         checklist_answers: answers,
       });
 
-      if (result.success) {
-        setPageState("success");
+      if (result.success && result.data) {
+        // Optimistic local update — no full reload
+        setTodaySubmissions((prev) => {
+          const rest = prev.filter(
+            (s) => s.report_template_id !== selectedTemplate.id
+          );
+          return [...rest, result.data!];
+        });
+        setFlashOk(selectedTemplate.title);
+        setSelectedTemplate(null);
+        setPageState("list");
+        setTimeout(() => setFlashOk(null), 2500);
+        window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         setPageState("form");
         alert(result.error || "Gagal mengirim. Coba lagi.");
@@ -174,8 +203,8 @@ export default function StaffStaticReportPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="text-center space-y-3">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-emerald-600 border-t-transparent" />
-          <p className="text-slate-600 font-medium">Memuat kegiatan...</p>
+          <div className="mx-auto h-9 w-9 animate-spin rounded-full border-[3px] border-emerald-600 border-t-transparent" />
+          <p className="text-slate-600 font-medium text-sm">Memuat…</p>
         </div>
       </div>
     );
@@ -193,41 +222,19 @@ export default function StaffStaticReportPage() {
     );
   }
 
-  if (pageState === "success") {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-white rounded-2xl border border-emerald-100 p-6 text-center space-y-4">
-          <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-600" />
-          <h1 className="text-2xl font-bold text-slate-900">Kegiatan Terkirim</h1>
-          <p className="text-slate-600">
-            {selectedTemplate?.title} — {checkedCount}/{totalCount} checklist
-          </p>
-          <Button
-            className="w-full h-12 text-base"
-            onClick={() => {
-              setSelectedTemplate(null);
-              loadContext();
-            }}
-          >
-            Kembali ke Daftar Kegiatan
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   if ((pageState === "form" || pageState === "submitting") && selectedTemplate) {
     const items = selectedTemplate.checklist_items || [];
     return (
-      <div className="min-h-screen bg-slate-50">
-        <header className="sticky top-0 z-10 bg-emerald-700 text-white px-4 py-4">
+      <div className="min-h-screen bg-slate-50 animate-in fade-in duration-150" ref={formTopRef}>
+        <header className="sticky top-0 z-10 bg-emerald-700 text-white px-4 py-3 shadow-sm">
           <button
             type="button"
-            className="text-sm text-emerald-100 mb-2 disabled:opacity-50"
-            onClick={() => pageState !== "submitting" && setPageState("list")}
+            className="inline-flex items-center gap-1 text-sm text-emerald-100 mb-1 active:opacity-70 disabled:opacity-40"
+            onClick={backToList}
             disabled={pageState === "submitting"}
           >
-            ← Kembali
+            <ChevronLeft className="h-4 w-4" />
+            Kembali
           </button>
           <h1 className="text-xl font-bold leading-tight">{selectedTemplate.title}</h1>
           {(selectedTemplate.target_time_start || selectedTemplate.target_time_end) && (
@@ -239,9 +246,8 @@ export default function StaffStaticReportPage() {
           )}
         </header>
 
-        <div className="p-4 space-y-5 max-w-lg mx-auto pb-32">
-          {/* Standar hasil */}
-          <div className="bg-white rounded-xl border p-4 space-y-2">
+        <div className="p-4 space-y-4 max-w-lg mx-auto pb-32">
+          <div className="bg-white rounded-xl border p-4 space-y-1.5">
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
               <Target className="h-4 w-4 text-emerald-700" />
               Standar hasil
@@ -251,72 +257,60 @@ export default function StaffStaticReportPage() {
             </p>
           </div>
 
-          {/* Checklist */}
-          <div className="bg-white rounded-xl border p-4 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="bg-white rounded-xl border p-4 space-y-2">
+            <div className="flex items-center justify-between mb-1">
               <h2 className="font-semibold text-slate-900">Checklist kerja</h2>
-              <span className="text-sm text-slate-500">
+              <span className="text-sm tabular-nums text-slate-500">
                 {checkedCount}/{totalCount}
               </span>
             </div>
-            <div className="space-y-3">
-              {items.map((item) => (
-                <label
-                  key={item.id}
-                  className={cn(
-                    "flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-colors",
-                    checkedMap[item.id]
-                      ? "bg-emerald-50 border-emerald-200"
-                      : "bg-white border-slate-200"
-                  )}
-                >
-                  <Checkbox
-                    checked={Boolean(checkedMap[item.id])}
-                    onCheckedChange={(v) =>
-                      setCheckedMap((prev) => ({ ...prev, [item.id]: Boolean(v) }))
-                    }
-                    className="mt-0.5 h-5 w-5"
+            <div className="space-y-2">
+              {items.map((item) => {
+                const on = Boolean(checkedMap[item.id]);
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
                     disabled={pageState === "submitting"}
-                  />
-                  <span className="text-base text-slate-800 leading-snug">
-                    {item.item_text}
-                  </span>
-                </label>
-              ))}
-              {items.length === 0 && (
-                <p className="text-sm text-slate-500">Checklist belum diatur.</p>
-              )}
+                    onClick={() => toggleCheck(item.id)}
+                    className={cn(
+                      "w-full flex items-start gap-3 p-3.5 rounded-xl border text-left transition-transform active:scale-[0.98]",
+                      on
+                        ? "bg-emerald-50 border-emerald-300"
+                        : "bg-white border-slate-200"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-colors",
+                        on
+                          ? "border-emerald-600 bg-emerald-600 text-white"
+                          : "border-slate-300 bg-white"
+                      )}
+                    >
+                      {on && <CheckCircle2 className="h-4 w-4" />}
+                    </span>
+                    <span className="text-[15px] text-slate-800 leading-snug pt-0.5">
+                      {item.item_text}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Foto */}
           {selectedTemplate.requires_photo ? (
             <div className="space-y-2">
               <p className="font-semibold text-slate-800 flex items-center gap-2">
                 <Camera className="h-4 w-4" />
                 Bukti foto (wajib)
               </p>
-              <p className="text-sm text-slate-500">
-                Upload foto kondisi setelah kegiatan selesai.
-              </p>
-              <PhotoUploader
-                label=""
-                required
-                size="large"
-                value={photo}
-                onChange={setPhoto}
-              />
+              <PhotoUploader label="" required size="large" value={photo} onChange={setPhoto} />
             </div>
           ) : (
-            <PhotoUploader
-              label="Foto (opsional)"
-              size="large"
-              value={photo}
-              onChange={setPhoto}
-            />
+            <PhotoUploader label="Foto (opsional)" size="large" value={photo} onChange={setPhoto} />
           )}
 
-          {/* Status kondisi — tombol besar */}
           <div className="space-y-2">
             <h2 className="font-semibold text-slate-900">Status kondisi</h2>
             <div className="grid grid-cols-1 gap-2">
@@ -327,7 +321,7 @@ export default function StaffStaticReportPage() {
                   disabled={pageState === "submitting"}
                   onClick={() => setStatusCondition(opt.value)}
                   className={cn(
-                    "h-14 rounded-xl border-2 text-base font-semibold transition-colors",
+                    "h-13 min-h-[52px] rounded-xl border-2 text-base font-semibold transition-transform active:scale-[0.98]",
                     statusCondition === opt.value
                       ? opt.value === "aman"
                         ? "border-emerald-600 bg-emerald-50 text-emerald-900"
@@ -341,36 +335,31 @@ export default function StaffStaticReportPage() {
             </div>
           </div>
 
-          {/* Catatan — tambahan saja */}
           <div className="space-y-2">
             <label className="block font-semibold text-slate-800">
-              Catatan kendala
-              {conditionNeedsNote ? " *" : " (opsional)"}
+              Catatan kendala{conditionNeedsNote ? " *" : " (opsional)"}
             </label>
-            <p className="text-xs text-slate-500">
-              Bukan laporan utama. Isi hanya jika ada kendala / perlu follow up.
-            </p>
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Contoh: sabun tinggal sedikit / saluran agak mampet"
-              className="min-h-24 text-base"
+              placeholder="Contoh: sabun tinggal sedikit"
+              className="min-h-20 text-base"
               disabled={pageState === "submitting"}
             />
           </div>
         </div>
 
-        <div className="fixed bottom-0 inset-x-0 bg-white border-t p-4">
+        <div className="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur border-t p-3 safe-pb">
           <div className="max-w-lg mx-auto">
             <Button
-              className="w-full h-14 text-lg font-semibold"
+              className="w-full h-14 text-lg font-semibold active:scale-[0.98] transition-transform"
               disabled={pageState === "submitting"}
               onClick={handleSubmit}
             >
               {pageState === "submitting" ? (
                 <span className="flex items-center gap-2">
                   <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Mengirim...
+                  Mengirim…
                 </span>
               ) : (
                 <span className="flex items-center gap-2">
@@ -386,14 +375,16 @@ export default function StaffStaticReportPage() {
   }
 
   // LIST
-  const renderActivityCard = (template: ReportTemplate) => {
+  const doneRequired = requiredTemplates.filter((t) => alreadySubmitted(t.id)).length;
+
+  const renderCard = (template: ReportTemplate) => {
     const done = alreadySubmitted(template.id);
     return (
       <button
         key={template.id}
         type="button"
         onClick={() => openForm(template)}
-        className="w-full text-left bg-white border rounded-xl p-4 hover:border-emerald-400 transition-colors active:scale-[0.99]"
+        className="w-full text-left bg-white border rounded-xl p-4 transition-transform active:scale-[0.98] hover:border-emerald-400"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -413,7 +404,9 @@ export default function StaffStaticReportPage() {
                       : "bg-amber-100 text-amber-800"
                   )}
                 >
-                  {done.status_condition === "aman" ? "Selesai" : "Ada kendala"}
+                  {done.status_condition === "aman"
+                    ? `Selesai ${done.checklist_checked ?? "?"}/${done.checklist_total ?? "?"}`
+                    : "Ada kendala"}
                 </span>
               )}
             </div>
@@ -423,42 +416,31 @@ export default function StaffStaticReportPage() {
             <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
               <span>{template.checklist_items?.length || 0} checklist</span>
               {template.requires_photo && (
-                <span className="flex items-center gap-1">
-                  <Camera className="h-3 w-3" /> Foto wajib
-                </span>
-              )}
-              {(template.target_time_start || template.target_time_end) && (
-                <span>
-                  {template.target_time_start}–{template.target_time_end}
+                <span className="inline-flex items-center gap-1">
+                  <Camera className="h-3 w-3" /> Foto
                 </span>
               )}
             </div>
           </div>
-          <span className="text-emerald-700 font-medium text-sm shrink-0">
-            {done ? "Update →" : "Isi →"}
+          <span className="text-emerald-700 font-semibold text-sm shrink-0 pt-1">
+            {done ? "Update" : "Isi"} →
           </span>
         </div>
       </button>
     );
   };
 
-  const doneRequired = requiredTemplates.filter((t) => alreadySubmitted(t.id)).length;
-
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-emerald-700 text-white px-4 py-5">
-        <p className="text-emerald-100 text-sm mb-1">Kegiatan Harian</p>
+      <header className="bg-emerald-700 text-white px-4 py-4">
+        <p className="text-emerald-100 text-sm mb-0.5">Kegiatan Harian (SOP)</p>
         <h1 className="text-2xl font-bold">{staffName}</h1>
-        <div className="mt-3 flex flex-wrap gap-2 text-sm">
-          <span className="inline-flex items-center gap-1.5 bg-emerald-800/50 rounded-lg px-3 py-1.5">
-            <User className="h-3.5 w-3.5" />
-            {staffName}
-          </span>
-          <span className="inline-flex items-center gap-1.5 bg-emerald-800/50 rounded-lg px-3 py-1.5">
+        <div className="mt-2 flex flex-wrap gap-2 text-sm">
+          <span className="inline-flex items-center gap-1.5 bg-emerald-800/50 rounded-lg px-2.5 py-1">
             <MapPin className="h-3.5 w-3.5" />
             {outlet}
           </span>
-          <span className="inline-flex items-center gap-1.5 bg-emerald-800/50 rounded-lg px-3 py-1.5">
+          <span className="inline-flex items-center gap-1.5 bg-emerald-800/50 rounded-lg px-2.5 py-1">
             <Briefcase className="h-3.5 w-3.5" />
             {position}
             {positionGroup ? ` · ${positionGroup}` : ""}
@@ -466,18 +448,23 @@ export default function StaffStaticReportPage() {
         </div>
       </header>
 
-      <div className="p-4 space-y-5 max-w-lg mx-auto pb-10">
-        <div className="bg-white border rounded-xl p-4">
-          <p className="text-sm text-slate-600">
-            Ikuti standar kerja. Centang checklist, upload foto, pilih kondisi.{" "}
-            <span className="font-medium text-slate-800">
-              Wajib hari ini: {doneRequired}/{requiredTemplates.length}
-            </span>
-          </p>
+      <div className="p-4 space-y-4 max-w-lg mx-auto pb-10">
+        {flashOk && (
+          <div className="flex items-center gap-2 bg-emerald-100 border border-emerald-200 text-emerald-900 rounded-xl px-4 py-3 text-sm font-medium animate-in fade-in slide-in-from-top-2 duration-200">
+            <CheckCircle2 className="h-5 w-5 shrink-0" />
+            {flashOk} terkirim
+          </div>
+        )}
+
+        <div className="bg-white border rounded-xl px-4 py-3 text-sm text-slate-600">
+          Centang checklist → foto → pilih kondisi.{" "}
+          <span className="font-semibold text-slate-900">
+            Wajib: {doneRequired}/{requiredTemplates.length}
+          </span>
         </div>
 
-        <section className="space-y-3">
-          <h2 className="font-semibold text-slate-800 flex items-center gap-2">
+        <section className="space-y-2.5">
+          <h2 className="font-semibold text-slate-800 flex items-center gap-2 text-sm">
             <ClipboardList className="h-4 w-4" />
             Kegiatan wajib hari ini
           </h2>
@@ -486,14 +473,14 @@ export default function StaffStaticReportPage() {
               Belum ada kegiatan wajib untuk jabatan Anda.
             </div>
           ) : (
-            requiredTemplates.map(renderActivityCard)
+            requiredTemplates.map(renderCard)
           )}
         </section>
 
         {otherTemplates.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="font-semibold text-slate-800">Lainnya / Lapor kendala</h2>
-            {otherTemplates.map(renderActivityCard)}
+          <section className="space-y-2.5">
+            <h2 className="font-semibold text-slate-800 text-sm">Lainnya / Lapor kendala</h2>
+            {otherTemplates.map(renderCard)}
           </section>
         )}
       </div>
