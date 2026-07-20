@@ -177,9 +177,9 @@ export default function SettingsPage() {
                   <FileText className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-foreground">Template Report Harian</h3>
+                  <h3 className="font-semibold text-foreground">Template Kegiatan SOP</h3>
                   <p className="text-sm text-muted-foreground">
-                    Jenis report per outlet & jabatan (wajib foto / wajib harian)
+                    Kegiatan standar: checklist, standar hasil, foto, target waktu
                   </p>
                 </div>
               </div>

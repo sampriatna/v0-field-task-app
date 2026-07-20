@@ -319,10 +319,31 @@ export interface UpdateUserPayload {
 }
 
 // =============================================
-// STAFF STATIC REPORT LINK (Daily Report)
+// STAFF STATIC REPORT LINK (Daily Report / SOP)
+// Report = kegiatan standar + checklist + foto + kondisi
+// Bukan input teks bebas.
 // =============================================
 
-export type DailyReportStatus = "submitted" | "issue" | "reviewed";
+/** Kondisi hasil kerja — pilihan tombol, bukan teks bebas */
+export type ReportConditionStatus =
+  | "aman"
+  | "kendala_ringan"
+  | "follow_up_leader"
+  | "perlu_belanja";
+
+export type ReportTemplateCategory =
+  | "Cleaning"
+  | "Opening"
+  | "Closing"
+  | "Stock"
+  | "Production"
+  | "Maintenance"
+  | "Kendala"
+  | "Special"
+  | "General";
+
+/** Jenis report: wajib harian | tugas khusus | quick kendala */
+export type ReportTemplateKind = "daily_required" | "special_task" | "issue_quick";
 
 export interface StaffReportLink {
   id: string;
@@ -331,47 +352,87 @@ export interface StaffReportLink {
   is_active: boolean;
   created_at: string;
   revoked_at?: string | null;
-  /** Denormalized for admin UI */
   staff_name?: string;
   outlet?: Outlet | string;
   position?: string;
   report_url?: string;
 }
 
-export interface ReportTemplate {
+export interface ReportTemplateChecklistItem {
   id: string;
-  outlet_id: string | null; // outlet code e.g. "KBU", null = semua outlet
-  position_group: string | null; // e.g. "Cook", null = semua jabatan
-  title: string;
-  description: string;
-  requires_photo: boolean;
-  is_required_daily: boolean;
-  active: boolean;
+  report_template_id: string;
+  item_text: string;
+  is_required: boolean;
   sort_order: number;
   created_at: string;
 }
 
+export interface ReportTemplate {
+  id: string;
+  title: string;
+  category: ReportTemplateCategory;
+  /** Outlet code e.g. "KBU", null = semua outlet */
+  outlet_id: string | null;
+  /** Jabatan/group: Waiters | Bar | Dapur | null = semua */
+  position_group: string | null;
+  /** Standar hasil kerja (SOP mini) */
+  standard_result: string;
+  /** Deskripsi singkat / tujuan — legacy alias display */
+  description: string;
+  requires_photo: boolean;
+  is_required_daily: boolean;
+  kind: ReportTemplateKind;
+  target_time_start?: string | null; // "09:00"
+  target_time_end?: string | null; // "10:00"
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+  checklist_items?: ReportTemplateChecklistItem[];
+}
+
 export interface CreateReportTemplatePayload {
+  title: string;
+  category?: ReportTemplateCategory;
   outlet_id?: string | null;
   position_group?: string | null;
-  title: string;
+  standard_result?: string;
   description?: string;
   requires_photo?: boolean;
   is_required_daily?: boolean;
+  kind?: ReportTemplateKind;
+  target_time_start?: string | null;
+  target_time_end?: string | null;
   active?: boolean;
   sort_order?: number;
+  checklist_items?: { item_text: string; is_required?: boolean; sort_order?: number }[];
 }
 
 export interface UpdateReportTemplatePayload {
   id: string;
+  title?: string;
+  category?: ReportTemplateCategory;
   outlet_id?: string | null;
   position_group?: string | null;
-  title?: string;
+  standard_result?: string;
   description?: string;
   requires_photo?: boolean;
   is_required_daily?: boolean;
+  kind?: ReportTemplateKind;
+  target_time_start?: string | null;
+  target_time_end?: string | null;
   active?: boolean;
   sort_order?: number;
+  checklist_items?: { item_text: string; is_required?: boolean; sort_order?: number }[];
+}
+
+export interface DailyReportChecklistAnswer {
+  id: string;
+  submission_id: string;
+  checklist_item_id: string;
+  checked: boolean;
+  created_at: string;
+  /** Denormalized */
+  item_text?: string;
 }
 
 export interface DailyReportSubmission {
@@ -379,24 +440,30 @@ export interface DailyReportSubmission {
   staff_id: string;
   outlet_id: string;
   report_template_id: string;
-  report_date: string; // YYYY-MM-DD
+  report_date: string;
+  status_condition: ReportConditionStatus;
   note: string;
   photo_url?: string | null;
-  status: DailyReportStatus;
   submitted_at: string;
   created_at: string;
+  checklist_answers?: DailyReportChecklistAnswer[];
   /** Denormalized for dashboard */
   staff_name?: string;
   outlet?: string;
   report_title?: string;
   position?: string;
+  checklist_total?: number;
+  checklist_checked?: number;
+  checklist_percent?: number;
 }
 
 export interface SubmitDailyReportPayload {
   token: string;
   report_template_id: string;
+  status_condition: ReportConditionStatus;
   note?: string;
   photo_base64?: string;
+  checklist_answers: { checklist_item_id: string; checked: boolean }[];
 }
 
 export interface StaffReportLinkContext {
@@ -425,7 +492,17 @@ export interface DailyReportDashboardSummary {
   staff_submitted: number;
   staff_not_submitted: number;
   reports_with_issue: number;
+  complete_ok: number;
+  complete_with_issue: number;
+  not_submitted: number;
 }
+
+/** Label warna dashboard */
+export type DailyReportRowLabel =
+  | "selesai_lengkap" // hijau
+  | "selesai_kendala" // kuning
+  | "belum_submit" // merah
+  | "tidak_wajib"; // abu
 
 export interface DailyReportDashboardRow {
   staff_id: string;
@@ -434,13 +511,18 @@ export interface DailyReportDashboardRow {
   position: string;
   report_template_id: string;
   report_title: string;
+  category?: string;
   is_required_daily: boolean;
   submitted: boolean;
   submission?: DailyReportSubmission | null;
   submitted_at?: string | null;
   photo_url?: string | null;
   note?: string | null;
-  status?: DailyReportStatus | null;
+  status_condition?: ReportConditionStatus | null;
+  checklist_total: number;
+  checklist_checked: number;
+  checklist_percent: number;
+  label: DailyReportRowLabel;
 }
 
 export interface DailyReportDashboardData {
@@ -449,3 +531,19 @@ export interface DailyReportDashboardData {
   submissions: DailyReportSubmission[];
   missing_required: DailyReportDashboardRow[];
 }
+
+/** @deprecated use status_condition */
+export type DailyReportStatus = "submitted" | "issue" | "reviewed";
+
+export const REPORT_CONDITION_OPTIONS: {
+  value: ReportConditionStatus;
+  label: string;
+  requiresNote: boolean;
+}[] = [
+  { value: "aman", label: "Aman", requiresNote: false },
+  { value: "kendala_ringan", label: "Ada kendala ringan", requiresNote: true },
+  { value: "follow_up_leader", label: "Perlu follow up leader", requiresNote: true },
+  { value: "perlu_belanja", label: "Perlu belanja/perbaikan", requiresNote: true },
+];
+
+export const REPORT_POSITION_GROUPS = ["Waiters", "Bar", "Dapur"] as const;
