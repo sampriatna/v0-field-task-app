@@ -314,6 +314,24 @@ export default function StaffStaticReportPage() {
                 Bukti foto (wajib)
               </p>
               <PhotoUploader label="" required size="large" value={photo} onChange={setPhoto} />
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-1.5 text-sm text-amber-950">
+                <p className="font-bold flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Peringatan foto
+                </p>
+                <p>
+                  Foto wajib asli, terbaru, dan sesuai area yang dikerjakan. Dilarang foto lama,
+                  blur, terlalu dekat, area berbeda, atau satu foto untuk banyak kegiatan.
+                </p>
+                {(positionGroup === "PA" ||
+                  selectedTemplate.position_group === "PA") && (
+                  <p className="font-medium">
+                    Jangan asal submit. Kalau toilet kotor tapi laporan bersih, tanaman belum
+                    disiram tapi laporan selesai, atau pakai foto lama — itu manipulasi laporan.
+                    Konsekuensi: teguran + pekerjaan wajib diulang.
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <PhotoUploader label="Foto (opsional)" size="large" value={photo} onChange={setPhoto} />
@@ -348,13 +366,23 @@ export default function StaffStaticReportPage() {
 
           <div className="space-y-2">
             <label className="block font-semibold text-slate-800">
-              Catatan kendala{conditionNeedsNote ? " *" : " (opsional)"}
+              Catatan laporan{conditionNeedsNote ? " *" : " (opsional)"}
             </label>
+            {(positionGroup === "PA" || selectedTemplate.position_group === "PA") && (
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Jangan cuma tulis &quot;sudah&quot;. Isi: kondisi awal → yang dikerjakan → kondisi
+                akhir → kendala (jika ada).
+              </p>
+            )}
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Contoh: sabun tinggal sedikit"
-              className="min-h-20 text-base"
+              placeholder={
+                positionGroup === "PA" || selectedTemplate.position_group === "PA"
+                  ? "Contoh: Toilet customer dibersihkan. Kloset disikat, lantai dipel, wastafel dilap, sampah dikosongkan. Kondisi akhir bersih, tidak bau. Kendala tidak ada."
+                  : "Contoh: sabun tinggal sedikit"
+              }
+              className="min-h-24 text-base"
               disabled={pageState === "submitting"}
             />
           </div>
@@ -542,8 +570,8 @@ export default function StaffStaticReportPage() {
                 Belum ada kegiatan wajib untuk jabatan &quot;{position}&quot;.
               </p>
               <p>
-                Minta admin set posisi ke <strong>Waiters / Bar / Dapur</strong>, atau buat
-                template dengan position_group = jabatan Anda di{" "}
+                Minta admin set posisi ke <strong>Waiters / Bar / Dapur / PA</strong> (atau OB /
+                Klindingan), atau buat template dengan position_group = jabatan Anda di{" "}
                 <span className="font-mono text-xs">Pengaturan → Template Kegiatan</span>.
               </p>
             </div>

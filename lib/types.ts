@@ -566,4 +566,4 @@ export const REPORT_CONDITION_OPTIONS: {
   { value: "perlu_belanja", label: "Perlu belanja/perbaikan", requiresNote: true },
 ];
 
-export const REPORT_POSITION_GROUPS = ["Waiters", "Bar", "Dapur"] as const;
+export const REPORT_POSITION_GROUPS = ["Waiters", "Bar", "Dapur", "PA"] as const;

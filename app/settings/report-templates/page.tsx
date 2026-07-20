@@ -318,7 +318,7 @@ export default function ReportTemplatesSettingsPage() {
                     <SelectItem value="ALL">Semua</SelectItem>
                     {REPORT_POSITION_GROUPS.map((g) => (
                       <SelectItem key={g} value={g}>
-                        {g}
+                        {g === "PA" ? "PA / OB (Public Area)" : g}
                       </SelectItem>
                     ))}
                   </SelectContent>

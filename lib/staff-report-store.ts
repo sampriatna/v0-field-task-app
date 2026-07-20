@@ -52,8 +52,24 @@ export function slugifyStaffName(name: string): string {
 export function normalizePositionGroup(position: string): string {
   const p = (position || "").trim().toLowerCase();
   if (!p) return "";
+  // PA / OB / Public Area (kebersihan) — sebelum Waiters agar "cleaning" tidak masuk Waiters
   if (
-    ["waiter", "waiters", "server", "floor", "cleaning", "pramusaji", "kasir"].some((k) =>
+    [
+      "pa",
+      "ob",
+      "public area",
+      "publicarea",
+      "office boy",
+      "officeboy",
+      "klindingan",
+      "cleaning",
+      "kebersihan",
+    ].some((k) => p === k || p.includes(k))
+  ) {
+    return "PA";
+  }
+  if (
+    ["waiter", "waiters", "server", "floor", "pramusaji", "kasir"].some((k) =>
       p.includes(k)
     )
   ) {
@@ -65,8 +81,7 @@ export function normalizePositionGroup(position: string): string {
   if (["cook", "chef", "dapur", "kitchen", "produksi"].some((k) => p.includes(k))) {
     return "Dapur";
   }
-  // fallback: capitalize first letter groups or raw
-  if (p === "waiters" || p === "bar" || p === "dapur") {
+  if (p === "waiters" || p === "bar" || p === "dapur" || p === "pa") {
     return p.charAt(0).toUpperCase() + p.slice(1);
   }
   return position.trim();
@@ -116,6 +131,18 @@ const seedStaff: Staff[] = [
     outlet: "KBU",
     area: "Floor",
     wa_number: "6281234567892",
+    role: "STAFF",
+    status: "ACTIVE",
+    created_at: nowISO(),
+    updated_at: nowISO(),
+  },
+  {
+    staff_id: "STF-004",
+    name: "Dedi Pratama",
+    position: "PA",
+    outlet: "KBU",
+    area: "Outdoor",
+    wa_number: "6281234567893",
     role: "STAFF",
     status: "ACTIVE",
     created_at: nowISO(),
@@ -177,7 +204,7 @@ function buildSeed(defs: SeedDef[]): {
       title: d.title,
       category: d.category,
       outlet_id: d.outlet_id ?? null,
-      position_group: d.position_group,
+      position_group: d.position_group || null,
       standard_result: d.standard_result,
       description: d.standard_result,
       requires_photo: d.requires_photo,
@@ -506,6 +533,215 @@ const { templates: seedTemplates, items: seedChecklistItems } = buildSeed([
       "Listrik non-esensial dimatikan",
     ],
   },
+  // —— PA / OB / Public Area — Kopi Buri Umah (KBU) ——
+  {
+    id: "RTPL-PA01",
+    title: "Opening Public Area Customer",
+    category: "Opening",
+    position_group: "PA",
+    outlet_id: "KBU",
+    standard_result:
+      "Area customer siap buka, bersih, kering, tidak bau, tidak ada sampah kecil, meja kursi rapi, lantai aman diinjak, dan semua titik terlihat layak untuk tamu.",
+    requires_photo: true,
+    is_required_daily: true,
+    target_time_start: "08:30",
+    target_time_end: "10:00",
+    sort_order: 1,
+    checklist: [
+      "Area depan outlet disapu bersih dari debu, daun, puntung rokok, plastik, tisu, dan sampah kecil",
+      "Area masuk / pintu / jalur customer bersih dan tidak licin",
+      "Meja customer dilap bersih, tidak lengket, tidak ada noda makanan/minuman",
+      "Kursi customer dirapikan sesuai posisi standar",
+      "Lantai area makan disapu dan dipel, tidak ada bekas minyak, tanah, atau remah",
+      "Kolong meja dicek, tidak ada sampah tersembunyi",
+      "Tempat sampah customer dikosongkan jika penuh, plastik diganti bila kotor/bau",
+      "Area tunggu / lobby / sekitar kasir luar bersih dan rapi",
+      "Kaca / pintu / area terlihat depan dilap jika ada bekas tangan atau noda",
+      "Foto laporan menampilkan area luas (bukan close-up satu titik saja)",
+    ],
+  },
+  {
+    id: "RTPL-PA02",
+    title: "Toilet Customer Check",
+    category: "Cleaning",
+    position_group: "PA",
+    outlet_id: "KBU",
+    standard_result:
+      "Toilet bersih, tidak bau pesing, lantai kering/aman, kloset bersih, wastafel bersih, sabun/tisu tersedia, dan tidak ada sampah menumpuk.",
+    requires_photo: true,
+    is_required_daily: true,
+    target_time_start: "09:00",
+    target_time_end: "10:00",
+    sort_order: 2,
+    checklist: [
+      "Kloset disikat bersih bagian dalam, dudukan, pinggir, dan area belakang",
+      "Lantai toilet disikat/pel, tidak licin, tidak ada rambut, tisu, atau noda kuning",
+      "Wastafel dibersihkan dari noda air, sisa sabun, rambut, dan kerak",
+      "Kaca toilet dilap, tidak buram dan tidak banyak bercak air",
+      "Tempat sampah toilet dikosongkan dan plastik diganti bila kotor/bau",
+      "Dinding sekitar kloset dicek, tidak ada cipratan atau noda",
+      "Gayung/ember/alat toilet dirapikan dan bersih",
+      "Sabun, tisu, atau kebutuhan toilet dicek (habis → tulis kendala)",
+      "Bau toilet dicek (masih bau setelah dibersihkan → lapor)",
+      "Foto menunjukkan kloset, lantai, wastafel, dan tempat sampah",
+    ],
+  },
+  {
+    id: "RTPL-PA03",
+    title: "Area Makan Customer Check",
+    category: "Cleaning",
+    position_group: "PA",
+    outlet_id: "KBU",
+    standard_result:
+      "Area makan customer selalu siap dipakai, meja tidak lengket, kursi rapi, lantai bersih, tidak ada sampah, dan area nyaman untuk tamu.",
+    requires_photo: true,
+    is_required_daily: true,
+    target_time_start: "10:00",
+    target_time_end: "12:00",
+    sort_order: 3,
+    checklist: [
+      "Meja yang sudah dipakai langsung dibersihkan",
+      "Sisa piring/gelas kotor dibantu angkat ke area cuci sesuai arahan",
+      "Permukaan meja dilap sampai tidak berminyak/lengket",
+      "Kursi dikembalikan ke posisi rapi",
+      "Lantai sekitar meja disapu dari remah, nasi, tulang, tisu, plastik, dan sampah kecil",
+      "Kolong meja dicek setelah customer pergi",
+      "Tissue, saus, sendok, atau perlengkapan meja dicek jika area tersebut pakai",
+      "Area tidak dibiarkan kotor lebih dari 5 menit setelah customer pergi",
+      "Jika area ramai dan belum sempat bersih, wajib tulis kendala (bukan diam)",
+      "Foto menampilkan area yang sudah dirapikan (bukan sebelum kerja)",
+    ],
+  },
+  {
+    id: "RTPL-PA04",
+    title: "Halaman & Parkiran Check",
+    category: "Cleaning",
+    position_group: "PA",
+    outlet_id: "KBU",
+    standard_result:
+      "Area depan terlihat bersih dari jalan, tidak ada sampah kecil, tidak ada daun menumpuk, parkiran rapi, dan kesan pertama customer bagus.",
+    requires_photo: true,
+    is_required_daily: true,
+    target_time_start: "10:00",
+    target_time_end: "11:30",
+    sort_order: 4,
+    checklist: [
+      "Area parkir disapu dari daun, plastik, puntung rokok, botol, tisu, dan sampah kecil",
+      "Jalur masuk customer bersih dan tidak mengganggu akses",
+      "Pot tanaman / area tanaman dicek, tidak ada sampah di dalam pot",
+      "Tanaman disiram sesuai kebutuhan (terutama pagi/sore saat panas)",
+      "Rumput kecil/liar yang terlihat mengganggu dicabut",
+      "Area depan signage / pagar / jalan masuk dirapikan",
+      "Genangan air, tanah becek, atau area licin wajib dilaporkan",
+      "Tempat sampah outdoor dicek, tidak boleh penuh sampai meluber",
+      "Rokok/puntung di area depan wajib dibersihkan",
+      "Foto menampilkan area depan secara luas",
+    ],
+  },
+  {
+    id: "RTPL-PA05",
+    title: "Taman, Tanaman & Rumput Kecil",
+    category: "Maintenance",
+    position_group: "PA",
+    outlet_id: "KBU",
+    standard_result:
+      "Tanaman terlihat hidup dan rapi, tidak kering karena lupa disiram, pot bersih dari sampah, dan rumput liar kecil tidak dibiarkan tumbuh berantakan.",
+    requires_photo: true,
+    is_required_daily: true,
+    target_time_start: "15:00",
+    target_time_end: "16:00",
+    sort_order: 5,
+    checklist: [
+      "Semua tanaman area customer dicek satu per satu",
+      "Tanaman disiram sesuai kondisi cuaca",
+      "Daun kering yang jatuh dibersihkan",
+      "Pot tanaman dibersihkan dari plastik, puntung rokok, tisu, atau sampah kecil",
+      "Rumput kecil/liar di jalur customer dicabut",
+      "Area sekitar tanaman disapu setelah disiram jika kotor",
+      "Tanaman rusak/kering difoto dan dilaporkan",
+      "Selang/alat siram dikembalikan ke tempatnya",
+      "Tidak hanya foto tanaman tanpa benar-benar disiram",
+      "Foto menunjukkan tanaman/area setelah rapi",
+    ],
+  },
+  {
+    id: "RTPL-PA06",
+    title: "Sampah & Tempat Sampah Check",
+    category: "Cleaning",
+    position_group: "PA",
+    outlet_id: "KBU",
+    standard_result:
+      "Tempat sampah tidak penuh, tidak bau, tidak meluber, plastik sampah rapi, dan area sekitar tempat sampah bersih.",
+    requires_photo: true,
+    is_required_daily: true,
+    target_time_start: "11:00",
+    target_time_end: "12:00",
+    sort_order: 6,
+    checklist: [
+      "Semua tempat sampah customer dicek",
+      "Tempat sampah toilet dicek",
+      "Tempat sampah outdoor dicek",
+      "Sampah yang penuh segera dibuang ke titik pembuangan",
+      "Plastik sampah diganti jika kotor, basah, atau bau",
+      "Area sekitar tempat sampah disapu/pel jika ada tumpahan",
+      "Tutup tempat sampah dibersihkan jika kotor",
+      "Sampah kardus/botol/plastik besar dipisahkan jika mengganggu area",
+      "Jika sampah belum bisa dibuang karena kendala, wajib tulis alasan jelas",
+      "Foto menunjukkan tempat sampah setelah dibersihkan",
+    ],
+  },
+  {
+    id: "RTPL-PA07",
+    title: "Mushola / Area Ibadah Check",
+    category: "Cleaning",
+    position_group: "PA",
+    outlet_id: "KBU",
+    standard_result:
+      "Area ibadah bersih, tidak bau, alat ibadah rapi, lantai bersih, dan layak digunakan customer/staff.",
+    requires_photo: true,
+    is_required_daily: true,
+    target_time_start: "10:00",
+    target_time_end: "11:00",
+    sort_order: 7,
+    checklist: [
+      "Lantai mushola disapu dan dipel",
+      "Sajadah/mukena/sarung dirapikan",
+      "Area wudhu dicek, tidak licin dan tidak bau",
+      "Sampah kecil dibersihkan",
+      "Rak/perlengkapan ibadah dirapikan",
+      "Kipas/lampu dicek menyala normal jika digunakan",
+      "Bau lembap wajib dilaporkan",
+      "Alat ibadah kotor wajib dipisahkan/lapor",
+      "Tidak ada barang pribadi berantakan",
+      "Foto area rapi setelah selesai",
+    ],
+  },
+  {
+    id: "RTPL-PA08",
+    title: "Closing Public Area Customer",
+    category: "Closing",
+    position_group: "PA",
+    outlet_id: "KBU",
+    standard_result:
+      "Area customer ditutup dalam kondisi bersih, sampah aman, toilet bersih, meja kursi rapi, lantai tidak meninggalkan kotoran untuk shift besok.",
+    requires_photo: true,
+    is_required_daily: true,
+    target_time_start: "21:00",
+    target_time_end: "22:00",
+    sort_order: 8,
+    checklist: [
+      "Semua meja customer dibersihkan",
+      "Semua kursi dirapikan",
+      "Lantai area makan disapu dan dipel titik kotor",
+      "Kolong meja dicek ulang",
+      "Toilet dicek ulang sebelum tutup",
+      "Tempat sampah dicek dan dibuang jika penuh/bau",
+      "Area depan dicek dari sampah malam (puntung rokok, plastik, tisu)",
+      "Peralatan kebersihan dicuci/rendam/dirapikan sesuai tempat",
+      "Kendala closing wajib ditulis jelas",
+      "Foto menunjukkan kondisi akhir area setelah tutup",
+    ],
+  },
   // —— Quick kendala (semua posisi) ——
   {
     id: "RTPL-K01",
@@ -536,6 +772,8 @@ const seedTokenRina =
   "b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff0011";
 const seedTokenAni =
   "c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff001122";
+const seedTokenDedi =
+  "d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00112233";
 
 type StoreState = {
   links: StaffReportLink[];
@@ -546,7 +784,7 @@ type StoreState = {
   staffCache: Staff[];
 };
 
-const globalKey = "__nusa_staff_report_store_v3__";
+const globalKey = "__nusa_staff_report_store_v5_pa__";
 
 function getState(): StoreState {
   const g = globalThis as unknown as Record<string, StoreState | undefined>;
@@ -576,6 +814,15 @@ function getState(): StoreState {
           staff_id: "STF-002",
           token: seedTokenAni,
           short_code: "ani",
+          is_active: true,
+          created_at: nowISO(),
+          revoked_at: null,
+        },
+        {
+          id: "SRL-004",
+          staff_id: "STF-004",
+          token: seedTokenDedi,
+          short_code: "dedi",
           is_active: true,
           created_at: nowISO(),
           revoked_at: null,
