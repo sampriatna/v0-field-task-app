@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight, AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { getTasks, getChecklistReports } from "@/lib/api";
 import type { Task, DashboardSummary, TaskStatus, Outlet, ChecklistReport, ChecklistSummary } from "@/lib/types";
@@ -391,6 +391,22 @@ export default function DashboardPage() {
                   <p className="font-medium text-foreground text-sm">Daily Activity SOP</p>
                   <p className="text-xs text-muted-foreground">
                     Lapisan tambahan — kegiatan harian standar (bukan pengganti task)
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href="/dashboard/leader-monitoring" className="col-span-2">
+            <Card className="hover:border-primary/50 transition-colors cursor-pointer border-slate-300">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="p-2 bg-slate-800 rounded-lg">
+                  <ShieldCheck className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground text-sm">Leader Monitoring</p>
+                  <p className="text-xs text-muted-foreground">
+                    Cek fisik lapangan — Opening, Jam Ramai, Spot Check, Closing, Issue Log
                   </p>
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground ml-auto" />

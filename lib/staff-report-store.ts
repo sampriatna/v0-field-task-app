@@ -1241,6 +1241,13 @@ export function submitDailyReport(input: {
     existing.outlet = staff.outlet;
     existing.report_title = template.title;
     existing.position = staff.position;
+    // Staff kirim ulang → reset validasi leader (harus dicek ulang)
+    existing.leader_validation = null;
+    existing.leader_validation_note = null;
+    existing.leader_validated_at = null;
+    existing.leader_validated_by = null;
+    existing.leader_validated_by_name = null;
+    existing.leader_validation_photo_url = null;
     // replace answers
     state.answers = state.answers.filter((a) => a.submission_id !== existing.id);
     submission = existing;
@@ -1280,10 +1287,18 @@ export function submitDailyReport(input: {
 function rowLabel(
   submitted: boolean,
   isRequired: boolean,
-  condition?: ReportConditionStatus | null
+  condition?: ReportConditionStatus | null,
+  leaderValidation?: string | null
 ): DailyReportRowLabel {
   if (!isRequired && !submitted) return "tidak_wajib";
   if (!submitted) return "belum_submit";
+  if (
+    leaderValidation === "revisi" ||
+    leaderValidation === "tidak_valid" ||
+    leaderValidation === "manipulasi"
+  ) {
+    return "perlu_perbaikan";
+  }
   if (condition && isIssueCondition(condition)) return "selesai_kendala";
   return "selesai_lengkap";
 }
@@ -1341,7 +1356,8 @@ export function buildDailyReportDashboard(
       const label = rowLabel(
         submitted,
         template.is_required_daily,
-        submission?.status_condition
+        submission?.status_condition,
+        submission?.leader_validation
       );
 
       rows.push({
@@ -1406,4 +1422,59 @@ export function buildDailyReportDashboard(
   });
 
   return { summary, rows, submissions: enrichedSubmissions, missing_required };
+}
+
+export function getSubmissionById(id: string): DailyReportSubmission | null {
+  const sub = getState().submissions.find((s) => s.id === id);
+  return sub ? enrichSubmission(sub) : null;
+}
+
+export function listSubmissionsNeedingFix(date?: string): DailyReportSubmission[] {
+  const d = date || todayISO();
+  return getState()
+    .submissions.filter((s) => s.report_date === d)
+    .filter(
+      (s) =>
+        s.leader_validation === "revisi" ||
+        s.leader_validation === "tidak_valid" ||
+        s.leader_validation === "manipulasi"
+    )
+    .map(enrichSubmission);
+}
+
+export function applyLeaderValidation(payload: {
+  submission_id: string;
+  validation: import("@/lib/types").StaffReportValidationStatus;
+  note?: string;
+  leader_id?: string;
+  leader_name?: string;
+  photo_base64?: string;
+}):
+  | { success: true; data: DailyReportSubmission }
+  | { success: false; error: string } {
+  const sub = getState().submissions.find((s) => s.id === payload.submission_id);
+  if (!sub) return { success: false, error: "Laporan staff tidak ditemukan." };
+
+  const valid = ["valid", "revisi", "tidak_valid", "manipulasi"];
+  if (!valid.includes(payload.validation)) {
+    return { success: false, error: "Status validasi tidak valid." };
+  }
+
+  if (payload.validation !== "valid" && !(payload.note || "").trim()) {
+    return {
+      success: false,
+      error: "Catatan wajib jika Revisi / Tidak valid / Manipulasi.",
+    };
+  }
+
+  sub.leader_validation = payload.validation;
+  sub.leader_validation_note = (payload.note || "").trim() || null;
+  sub.leader_validated_at = nowISO();
+  sub.leader_validated_by = payload.leader_id || "LEADER";
+  sub.leader_validated_by_name = payload.leader_name || "Leader";
+  if (payload.photo_base64) {
+    sub.leader_validation_photo_url = payload.photo_base64;
+  }
+
+  return { success: true, data: enrichSubmission(sub) };
 }

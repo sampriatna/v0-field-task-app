@@ -72,6 +72,14 @@ Hub: `/settings/daily-activity`
 
 Staff outlet **KBU** dengan posisi PA/OB melihat 8 kegiatan ini. Form menampilkan peringatan foto ketat + panduan catatan (kondisi awal → dikerjakan → akhir → kendala).
 
+## Leader Monitoring (lapisan kontrol)
+
+Staff submit ≠ otomatis benar. Leader cek fisik via `/dashboard/leader-monitoring`:
+
+- Opening · Jam Ramai · Spot Check · Closing · Issue Log
+- Validasi laporan: Valid / Revisi / Tidak valid / Manipulasi
+- Docs: `docs/LEADER_MONITORING.md`
+
 ## Demo seed
 
 | Staff | Posisi | Short link |
