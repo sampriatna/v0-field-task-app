@@ -348,14 +348,20 @@ export type ReportTemplateKind = "daily_required" | "special_task" | "issue_quic
 export interface StaffReportLink {
   id: string;
   staff_id: string;
+  /** Token aman panjang (internal / fallback) */
   token: string;
+  /** Kode pendek dari nama, contoh: dul → /r/dul */
+  short_code: string;
   is_active: boolean;
   created_at: string;
   revoked_at?: string | null;
   staff_name?: string;
   outlet?: Outlet | string;
   position?: string;
+  /** URL pendek untuk dibagikan */
   report_url?: string;
+  /** URL panjang (token) — cadangan */
+  report_url_long?: string;
 }
 
 export interface ReportTemplateChecklistItem {

@@ -155,9 +155,9 @@ export default function DailyReportsDashboardPage() {
       <div className="p-4 space-y-4 max-w-5xl mx-auto">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h2 className="font-semibold text-foreground">Kegiatan Standar Staff</h2>
+            <h2 className="font-semibold text-foreground">Kinerja per staff × kegiatan</h2>
             <p className="text-sm text-muted-foreground">
-              Lapisan tambahan di atas Task — checklist + foto + kondisi (bukan pengganti task WA)
+              Dashboard terpisah dari Task. Setiap baris = 1 orang + 1 kegiatan hari itu.
             </p>
           </div>
           <div className="flex gap-2">
@@ -174,6 +174,14 @@ export default function DailyReportsDashboardPage() {
             </Button>
           </div>
         </div>
+
+        <Card className="border-blue-200 bg-blue-50">
+          <CardContent className="p-3 text-sm text-blue-900">
+            <strong>Terpisah dari Task.</strong> Ini audit Daily Activity SOP per person —
+            siapa sudah/belum isi kegiatan standar hari ini. Task WA/deadline tetap di Dashboard
+            utama.
+          </CardContent>
+        </Card>
 
         {/* Color legend */}
         <div className="flex flex-wrap gap-2 text-xs">

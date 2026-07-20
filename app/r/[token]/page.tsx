@@ -379,52 +379,69 @@ export default function StaffStaticReportPage() {
 
   const renderCard = (template: ReportTemplate) => {
     const done = alreadySubmitted(template.id);
+    const isKendala = template.kind === "issue_quick" || template.category === "Kendala";
     return (
       <button
         key={template.id}
         type="button"
         onClick={() => openForm(template)}
-        className="w-full text-left bg-white border rounded-xl p-4 transition-transform active:scale-[0.98] hover:border-emerald-400"
+        className={cn(
+          "w-full text-left rounded-2xl p-4 transition-transform active:scale-[0.98] border-2 shadow-sm",
+          isKendala
+            ? "bg-amber-50 border-amber-300 hover:border-amber-500"
+            : "bg-white border-emerald-200 hover:border-emerald-500"
+        )}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h2 className="font-semibold text-slate-900 text-lg">{template.title}</h2>
-              {template.is_required_daily && (
-                <span className="text-xs font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
-                  Wajib
-                </span>
-              )}
-              {done && (
-                <span
-                  className={cn(
-                    "text-xs font-medium px-2 py-0.5 rounded",
-                    done.status_condition === "aman"
-                      ? "bg-emerald-100 text-emerald-800"
-                      : "bg-amber-100 text-amber-800"
-                  )}
-                >
-                  {done.status_condition === "aman"
-                    ? `Selesai ${done.checklist_checked ?? "?"}/${done.checklist_total ?? "?"}`
-                    : "Ada kendala"}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-slate-500 line-clamp-2">
-              {template.standard_result || template.description}
-            </p>
-            <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
-              <span>{template.checklist_items?.length || 0} checklist</span>
-              {template.requires_photo && (
-                <span className="inline-flex items-center gap-1">
-                  <Camera className="h-3 w-3" /> Foto
-                </span>
-              )}
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <h2 className="font-bold text-slate-900 text-lg">{template.title}</h2>
+                {template.is_required_daily && (
+                  <span className="text-xs font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
+                    Wajib
+                  </span>
+                )}
+                {done && (
+                  <span
+                    className={cn(
+                      "text-xs font-medium px-2 py-0.5 rounded",
+                      done.status_condition === "aman"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-amber-100 text-amber-800"
+                    )}
+                  >
+                    {done.status_condition === "aman"
+                      ? `Selesai ${done.checklist_checked ?? "?"}/${done.checklist_total ?? "?"}`
+                      : "Ada kendala"}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-slate-600 line-clamp-2">
+                {template.standard_result || template.description}
+              </p>
+              <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
+                <span>{template.checklist_items?.length || 0} checklist</span>
+                {template.requires_photo && (
+                  <span className="inline-flex items-center gap-1">
+                    <Camera className="h-3 w-3" /> Foto
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <span className="text-emerald-700 font-semibold text-sm shrink-0 pt-1">
-            {done ? "Update" : "Isi"} →
-          </span>
+          <div
+            className={cn(
+              "w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2",
+              isKendala
+                ? "bg-amber-500 text-white"
+                : done
+                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                  : "bg-emerald-600 text-white"
+            )}
+          >
+            {isKendala ? "Lapor kendala →" : done ? "Update kegiatan →" : "Isi kegiatan →"}
+          </div>
         </div>
       </button>
     );
@@ -469,8 +486,15 @@ export default function StaffStaticReportPage() {
             Kegiatan wajib hari ini
           </h2>
           {requiredTemplates.length === 0 ? (
-            <div className="bg-white border rounded-xl p-6 text-center text-slate-500 text-sm">
-              Belum ada kegiatan wajib untuk jabatan Anda.
+            <div className="bg-white border rounded-xl p-5 text-sm text-slate-600 space-y-2">
+              <p className="font-medium text-slate-800">
+                Belum ada kegiatan wajib untuk jabatan &quot;{position}&quot;.
+              </p>
+              <p>
+                Minta admin set posisi ke <strong>Waiters / Bar / Dapur</strong>, atau buat
+                template dengan position_group = jabatan Anda di{" "}
+                <span className="font-mono text-xs">Pengaturan → Template Kegiatan</span>.
+              </p>
             </div>
           ) : (
             requiredTemplates.map(renderCard)

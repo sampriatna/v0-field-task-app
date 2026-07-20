@@ -36,6 +36,18 @@ export function generateReportToken(): string {
   return randomBytes(32).toString("hex");
 }
 
+/** Nama → slug pendek: "DUL" → "dul", "Budi Santoso" → "budisantoso" */
+export function slugifyStaffName(name: string): string {
+  const raw = (name || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .slice(0, 48)
+    .replace(/[^a-z0-9]+/g, "")
+    .slice(0, 24);
+  return raw || "staff";
+}
+
 /** Map jabatan staff → position_group template */
 export function normalizePositionGroup(position: string): string {
   const p = (position || "").trim().toLowerCase();
@@ -510,7 +522,7 @@ type StoreState = {
   staffCache: Staff[];
 };
 
-const globalKey = "__nusa_staff_report_store_v2__";
+const globalKey = "__nusa_staff_report_store_v3__";
 
 function getState(): StoreState {
   const g = globalThis as unknown as Record<string, StoreState | undefined>;
@@ -521,6 +533,7 @@ function getState(): StoreState {
           id: "SRL-001",
           staff_id: "STF-001",
           token: seedTokenBudi,
+          short_code: "budi",
           is_active: true,
           created_at: nowISO(),
           revoked_at: null,
@@ -529,6 +542,7 @@ function getState(): StoreState {
           id: "SRL-002",
           staff_id: "STF-003",
           token: seedTokenRina,
+          short_code: "rina",
           is_active: true,
           created_at: nowISO(),
           revoked_at: null,
@@ -537,6 +551,7 @@ function getState(): StoreState {
           id: "SRL-003",
           staff_id: "STF-002",
           token: seedTokenAni,
+          short_code: "ani",
           is_active: true,
           created_at: nowISO(),
           revoked_at: null,
@@ -550,6 +565,30 @@ function getState(): StoreState {
     };
   }
   return g[globalKey]!;
+}
+
+function ensureUniqueShortCode(base: string, excludeLinkId?: string): string {
+  let code = base || "staff";
+  let n = 0;
+  const links = getState().links;
+  while (
+    links.some(
+      (l) => l.is_active && l.short_code === code && l.id !== excludeLinkId
+    )
+  ) {
+    n += 1;
+    code = `${base}${n}`;
+  }
+  return code;
+}
+
+/** Pastikan link punya short_code (migrasi link lama). */
+function ensureLinkShortCode(link: StaffReportLink): StaffReportLink {
+  if (link.short_code) return link;
+  const staff = findStaff(link.staff_id);
+  const base = slugifyStaffName(staff?.name || link.staff_id);
+  link.short_code = ensureUniqueShortCode(base, link.id);
+  return link;
 }
 
 export function setStaffCache(staff: Staff[]): void {
@@ -596,13 +635,16 @@ export function matchTemplatesForStaff(
 }
 
 function enrichLink(link: StaffReportLink, origin?: string): StaffReportLink {
+  ensureLinkShortCode(link);
   const staff = findStaff(link.staff_id);
+  const base = origin || "";
   return {
     ...link,
     staff_name: staff?.name,
     outlet: staff?.outlet,
     position: staff?.position,
-    report_url: `${origin || ""}/r/${link.token}`,
+    report_url: `${base}/r/${link.short_code}`,
+    report_url_long: `${base}/r/${link.token}`,
   };
 }
 
@@ -610,8 +652,18 @@ export function listStaffReportLinks(origin?: string): StaffReportLink[] {
   return getState().links.map((l) => enrichLink(l, origin));
 }
 
-export function getLinkByToken(token: string): StaffReportLink | undefined {
-  return getState().links.find((l) => l.token === token);
+/** Cari link by short_code ATAU token panjang */
+export function getLinkByToken(tokenOrCode: string): StaffReportLink | undefined {
+  const key = (tokenOrCode || "").trim().toLowerCase();
+  if (!key) return undefined;
+  const link = getState().links.find(
+    (l) =>
+      l.token === tokenOrCode ||
+      l.token.toLowerCase() === key ||
+      (l.short_code && l.short_code.toLowerCase() === key)
+  );
+  if (link) ensureLinkShortCode(link);
+  return link;
 }
 
 export function generateStaffReportLink(
@@ -630,10 +682,12 @@ export function generateStaffReportLink(
     }
   }
 
+  const short_code = ensureUniqueShortCode(slugifyStaffName(staff.name));
   const newLink: StaffReportLink = {
     id: uid("SRL"),
     staff_id: staffId,
     token: generateReportToken(),
+    short_code,
     is_active: true,
     created_at: nowISO(),
     revoked_at: null,
@@ -769,11 +823,11 @@ function enrichSubmission(sub: DailyReportSubmission): DailyReportSubmission {
 export function getStaffReportByToken(
   token: string
 ): { success: true; data: StaffReportLinkContext } | { success: false; error: string } {
-  if (!token || token.length < 16) {
+  if (!token || token.trim().length < 2) {
     return { success: false, error: "Token tidak valid" };
   }
 
-  const link = getLinkByToken(token);
+  const link = getLinkByToken(token.trim());
   if (!link) {
     return { success: false, error: "Link tidak ditemukan. Hubungi atasan Anda." };
   }
