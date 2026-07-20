@@ -18,6 +18,15 @@ import type {
   UserLogin,
   CreateUserPayload,
   UpdateUserPayload,
+  StaffReportLink,
+  ReportTemplate,
+  CreateReportTemplatePayload,
+  UpdateReportTemplatePayload,
+  DailyReportSubmission,
+  SubmitDailyReportPayload,
+  StaffReportLinkContext,
+  DailyReportFilters,
+  DailyReportDashboardData,
 } from "./types";
 import { 
   mockTasks, 
@@ -1322,4 +1331,136 @@ export async function deleteCategory(name: string): Promise<ApiResponse<void>> {
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Gagal menghapus kategori" };
   }
+}
+
+// =============================================
+// STAFF STATIC REPORT LINK (Daily Report)
+// Uses dedicated Next.js API routes (not GAS).
+// =============================================
+
+async function callStaffReportApi<T>(
+  path: string,
+  options?: { method?: "GET" | "POST" | "PUT"; body?: Record<string, unknown> }
+): Promise<ApiResponse<T>> {
+  try {
+    const method = options?.method || "GET";
+    const response = await fetch(`/api/staff-reports${path}`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: options?.body ? JSON.stringify(options.body) : undefined,
+    });
+
+    if (response.status === 401) {
+      if (typeof window !== "undefined" && !path.includes("/by-token/") && !path.includes("/submit")) {
+        window.location.href = "/login";
+      }
+      return { success: false, error: "Sesi telah berakhir. Silakan login kembali." };
+    }
+
+    if (response.status === 413) {
+      return {
+        success: false,
+        error: "Foto terlalu besar untuk dikirim. Coba ambil ulang foto, lalu kirim lagi.",
+      };
+    }
+
+    const text = await response.text();
+    let result: ApiResponse<T>;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      return { success: false, error: "Server mengembalikan respons yang tidak valid." };
+    }
+
+    if (!result.success && result.error) {
+      return { success: false, error: result.error };
+    }
+    return { success: Boolean(result.success), data: result.data as T, error: result.error };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menghubungi server",
+    };
+  }
+}
+
+/** Public: load staff identity + templates by permanent token */
+export async function getStaffReportByToken(
+  token: string
+): Promise<ApiResponse<Omit<StaffReportLinkContext, "link"> & { link_active: boolean }>> {
+  return callStaffReportApi(`/by-token/${encodeURIComponent(token)}`);
+}
+
+/** Public: submit daily report — staff_id taken from token server-side */
+export async function submitDailyReport(
+  payload: SubmitDailyReportPayload
+): Promise<ApiResponse<DailyReportSubmission>> {
+  return callStaffReportApi("/submit", {
+    method: "POST",
+    body: payload as unknown as Record<string, unknown>,
+  });
+}
+
+export async function getStaffReportLinks(): Promise<ApiResponse<StaffReportLink[]>> {
+  return callStaffReportApi("/links");
+}
+
+export async function generateStaffReportLink(
+  staffId: string
+): Promise<ApiResponse<StaffReportLink>> {
+  return callStaffReportApi("/links", {
+    method: "POST",
+    body: { staff_id: staffId },
+  });
+}
+
+export async function revokeStaffReportLink(
+  linkId: string
+): Promise<ApiResponse<StaffReportLink>> {
+  return callStaffReportApi(`/links/${encodeURIComponent(linkId)}/revoke`, {
+    method: "POST",
+    body: {},
+  });
+}
+
+export async function getReportTemplates(): Promise<ApiResponse<ReportTemplate[]>> {
+  return callStaffReportApi("/templates");
+}
+
+export async function createReportTemplate(
+  payload: CreateReportTemplatePayload
+): Promise<ApiResponse<ReportTemplate>> {
+  return callStaffReportApi("/templates", {
+    method: "POST",
+    body: payload as unknown as Record<string, unknown>,
+  });
+}
+
+export async function updateReportTemplate(
+  payload: UpdateReportTemplatePayload
+): Promise<ApiResponse<ReportTemplate>> {
+  return callStaffReportApi(`/templates/${encodeURIComponent(payload.id)}`, {
+    method: "PUT",
+    body: payload as unknown as Record<string, unknown>,
+  });
+}
+
+export async function getDailyReportDashboard(
+  filters?: DailyReportFilters
+): Promise<ApiResponse<DailyReportDashboardData>> {
+  const params = new URLSearchParams();
+  if (filters?.date) params.set("date", filters.date);
+  if (filters?.outlet) params.set("outlet", filters.outlet);
+  if (filters?.staff_id) params.set("staff_id", filters.staff_id);
+  if (filters?.report_template_id) params.set("report_template_id", filters.report_template_id);
+  if (filters?.submit_status) params.set("submit_status", filters.submit_status);
+  const qs = params.toString();
+  return callStaffReportApi(`/dashboard${qs ? `?${qs}` : ""}`);
+}
+
+export function buildStaffStaticReportLink(token: string, origin?: string): string {
+  const base =
+    origin || (typeof window !== "undefined" ? window.location.origin : "");
+  return `${base}/r/${token}`;
 }

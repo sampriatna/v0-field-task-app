@@ -33,10 +33,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { getStaff, createStaff, updateStaff, deactivateStaff, activateStaff } from "@/lib/api";
+import { getStaff, createStaff, updateStaff, deactivateStaff, activateStaff, generateStaffReportLink } from "@/lib/api";
 import { outlets, areas } from "@/lib/mock-data";
 import type { Staff, CreateStaffPayload, Outlet, Area, StaffRole } from "@/lib/types";
-import { Plus, Pencil, UserX, UserCheck, Search, Users, Phone } from "lucide-react";
+import { Plus, Pencil, UserX, UserCheck, Search, Users, Phone, Link2 } from "lucide-react";
 
 const roles: { value: StaffRole; label: string }[] = [
   { value: "STAFF", label: "Staff" },
@@ -221,6 +221,39 @@ export default function StaffMasterPage() {
     }
   };
 
+  const handleGenerateReportLink = async (staff: Staff) => {
+    try {
+      const result = await generateStaffReportLink(staff.staff_id);
+      if (result.success && result.data) {
+        const url = result.data.report_url || `${window.location.origin}/r/${result.data.token}`;
+        try {
+          await navigator.clipboard.writeText(url);
+          toast({
+            title: "Link report dibuat",
+            description: "Link disalin ke clipboard",
+          });
+        } catch {
+          toast({
+            title: "Link report dibuat",
+            description: url,
+          });
+        }
+      } else {
+        toast({
+          title: "Gagal",
+          description: result.error || "Gagal membuat link",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Gagal membuat link",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <MobileHeader title="Master Staff" showBack backHref="/settings" />
@@ -326,6 +359,16 @@ export default function StaffMasterPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {staff.status === "ACTIVE" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Generate link report"
+                          onClick={() => handleGenerateReportLink(staff)}
+                        >
+                          <Link2 className="w-4 h-4 text-emerald-700" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => openEditForm(staff)}>
                         <Pencil className="w-4 h-4" />
                       </Button>

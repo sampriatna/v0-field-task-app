@@ -317,3 +317,135 @@ export interface UpdateUserPayload {
   role?: StaffRole;
   login_enabled?: boolean;
 }
+
+// =============================================
+// STAFF STATIC REPORT LINK (Daily Report)
+// =============================================
+
+export type DailyReportStatus = "submitted" | "issue" | "reviewed";
+
+export interface StaffReportLink {
+  id: string;
+  staff_id: string;
+  token: string;
+  is_active: boolean;
+  created_at: string;
+  revoked_at?: string | null;
+  /** Denormalized for admin UI */
+  staff_name?: string;
+  outlet?: Outlet | string;
+  position?: string;
+  report_url?: string;
+}
+
+export interface ReportTemplate {
+  id: string;
+  outlet_id: string | null; // outlet code e.g. "KBU", null = semua outlet
+  position_group: string | null; // e.g. "Cook", null = semua jabatan
+  title: string;
+  description: string;
+  requires_photo: boolean;
+  is_required_daily: boolean;
+  active: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface CreateReportTemplatePayload {
+  outlet_id?: string | null;
+  position_group?: string | null;
+  title: string;
+  description?: string;
+  requires_photo?: boolean;
+  is_required_daily?: boolean;
+  active?: boolean;
+  sort_order?: number;
+}
+
+export interface UpdateReportTemplatePayload {
+  id: string;
+  outlet_id?: string | null;
+  position_group?: string | null;
+  title?: string;
+  description?: string;
+  requires_photo?: boolean;
+  is_required_daily?: boolean;
+  active?: boolean;
+  sort_order?: number;
+}
+
+export interface DailyReportSubmission {
+  id: string;
+  staff_id: string;
+  outlet_id: string;
+  report_template_id: string;
+  report_date: string; // YYYY-MM-DD
+  note: string;
+  photo_url?: string | null;
+  status: DailyReportStatus;
+  submitted_at: string;
+  created_at: string;
+  /** Denormalized for dashboard */
+  staff_name?: string;
+  outlet?: string;
+  report_title?: string;
+  position?: string;
+}
+
+export interface SubmitDailyReportPayload {
+  token: string;
+  report_template_id: string;
+  note?: string;
+  photo_base64?: string;
+}
+
+export interface StaffReportLinkContext {
+  link: StaffReportLink;
+  staff: {
+    staff_id: string;
+    name: string;
+    outlet: string;
+    position: string;
+    position_group: string;
+  };
+  templates: ReportTemplate[];
+  today_submissions: DailyReportSubmission[];
+}
+
+export interface DailyReportFilters {
+  date?: string;
+  outlet?: string;
+  staff_id?: string;
+  report_template_id?: string;
+  submit_status?: "submitted" | "not_submitted" | "all";
+}
+
+export interface DailyReportDashboardSummary {
+  total_today: number;
+  staff_submitted: number;
+  staff_not_submitted: number;
+  reports_with_issue: number;
+}
+
+export interface DailyReportDashboardRow {
+  staff_id: string;
+  staff_name: string;
+  outlet: string;
+  position: string;
+  report_template_id: string;
+  report_title: string;
+  is_required_daily: boolean;
+  submitted: boolean;
+  submission?: DailyReportSubmission | null;
+  submitted_at?: string | null;
+  photo_url?: string | null;
+  note?: string | null;
+  status?: DailyReportStatus | null;
+}
+
+export interface DailyReportDashboardData {
+  summary: DailyReportDashboardSummary;
+  rows: DailyReportDashboardRow[];
+  submissions: DailyReportSubmission[];
+  missing_required: DailyReportDashboardRow[];
+}
