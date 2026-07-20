@@ -348,14 +348,20 @@ export type ReportTemplateKind = "daily_required" | "special_task" | "issue_quic
 export interface StaffReportLink {
   id: string;
   staff_id: string;
+  /** Token aman panjang (internal / fallback) */
   token: string;
+  /** Kode pendek dari nama, contoh: dul → /r/dul */
+  short_code: string;
   is_active: boolean;
   created_at: string;
   revoked_at?: string | null;
   staff_name?: string;
   outlet?: Outlet | string;
   position?: string;
+  /** URL pendek untuk dibagikan */
   report_url?: string;
+  /** URL panjang (token) — cadangan */
+  report_url_long?: string;
 }
 
 export interface ReportTemplateChecklistItem {
@@ -466,6 +472,20 @@ export interface SubmitDailyReportPayload {
   checklist_answers: { checklist_item_id: string; checked: boolean }[];
 }
 
+export interface KendalaNotifyInfo {
+  needed: boolean;
+  gas_sent: boolean;
+  gas_error?: string;
+  leaders: {
+    staff_id: string;
+    name: string;
+    wa_number: string;
+    outlet: string;
+    wa_link: string;
+  }[];
+  message: string;
+}
+
 export interface StaffReportLinkContext {
   link: StaffReportLink;
   staff: {
@@ -546,4 +566,4 @@ export const REPORT_CONDITION_OPTIONS: {
   { value: "perlu_belanja", label: "Perlu belanja/perbaikan", requiresNote: true },
 ];
 
-export const REPORT_POSITION_GROUPS = ["Waiters", "Bar", "Dapur"] as const;
+export const REPORT_POSITION_GROUPS = ["Waiters", "Bar", "Dapur", "PA"] as const;

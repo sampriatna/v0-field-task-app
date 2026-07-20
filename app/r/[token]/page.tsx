@@ -16,12 +16,14 @@ import {
   Clock,
   Target,
   ChevronLeft,
+  MessageCircle,
 } from "lucide-react";
 import { getStaffReportByToken, submitDailyReport } from "@/lib/api";
 import type {
   ReportTemplate,
   DailyReportSubmission,
   ReportConditionStatus,
+  KendalaNotifyInfo,
 } from "@/lib/types";
 import { REPORT_CONDITION_OPTIONS } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -43,6 +45,7 @@ export default function StaffStaticReportPage() {
   const [templates, setTemplates] = useState<ReportTemplate[]>([]);
   const [todaySubmissions, setTodaySubmissions] = useState<DailyReportSubmission[]>([]);
   const [flashOk, setFlashOk] = useState<string | null>(null);
+  const [kendalaNotify, setKendalaNotify] = useState<KendalaNotifyInfo | null>(null);
 
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplate | null>(null);
   const [checkedMap, setCheckedMap] = useState<Record<string, boolean>>({});
@@ -185,9 +188,14 @@ export default function StaffStaticReportPage() {
           return [...rest, result.data!];
         });
         setFlashOk(selectedTemplate.title);
+        if (result.notify?.needed) {
+          setKendalaNotify(result.notify);
+        } else {
+          setKendalaNotify(null);
+        }
         setSelectedTemplate(null);
         setPageState("list");
-        setTimeout(() => setFlashOk(null), 2500);
+        setTimeout(() => setFlashOk(null), 4000);
         window.scrollTo({ top: 0, behavior: "smooth" });
       } else {
         setPageState("form");
@@ -306,6 +314,24 @@ export default function StaffStaticReportPage() {
                 Bukti foto (wajib)
               </p>
               <PhotoUploader label="" required size="large" value={photo} onChange={setPhoto} />
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 space-y-1.5 text-sm text-amber-950">
+                <p className="font-bold flex items-center gap-1.5">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  Peringatan foto
+                </p>
+                <p>
+                  Foto wajib asli, terbaru, dan sesuai area yang dikerjakan. Dilarang foto lama,
+                  blur, terlalu dekat, area berbeda, atau satu foto untuk banyak kegiatan.
+                </p>
+                {(positionGroup === "PA" ||
+                  selectedTemplate.position_group === "PA") && (
+                  <p className="font-medium">
+                    Jangan asal submit. Kalau toilet kotor tapi laporan bersih, tanaman belum
+                    disiram tapi laporan selesai, atau pakai foto lama — itu manipulasi laporan.
+                    Konsekuensi: teguran + pekerjaan wajib diulang.
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <PhotoUploader label="Foto (opsional)" size="large" value={photo} onChange={setPhoto} />
@@ -313,6 +339,9 @@ export default function StaffStaticReportPage() {
 
           <div className="space-y-2">
             <h2 className="font-semibold text-slate-900">Status kondisi</h2>
+            <p className="text-xs text-slate-500">
+              Jika bukan Aman, sistem hubungi Leader (WA otomatis / tombol chat).
+            </p>
             <div className="grid grid-cols-1 gap-2">
               {REPORT_CONDITION_OPTIONS.map((opt) => (
                 <button
@@ -337,13 +366,23 @@ export default function StaffStaticReportPage() {
 
           <div className="space-y-2">
             <label className="block font-semibold text-slate-800">
-              Catatan kendala{conditionNeedsNote ? " *" : " (opsional)"}
+              Catatan laporan{conditionNeedsNote ? " *" : " (opsional)"}
             </label>
+            {(positionGroup === "PA" || selectedTemplate.position_group === "PA") && (
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Jangan cuma tulis &quot;sudah&quot;. Isi: kondisi awal → yang dikerjakan → kondisi
+                akhir → kendala (jika ada).
+              </p>
+            )}
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Contoh: sabun tinggal sedikit"
-              className="min-h-20 text-base"
+              placeholder={
+                positionGroup === "PA" || selectedTemplate.position_group === "PA"
+                  ? "Contoh: Toilet customer dibersihkan. Kloset disikat, lantai dipel, wastafel dilap, sampah dikosongkan. Kondisi akhir bersih, tidak bau. Kendala tidak ada."
+                  : "Contoh: sabun tinggal sedikit"
+              }
+              className="min-h-24 text-base"
               disabled={pageState === "submitting"}
             />
           </div>
@@ -379,52 +418,69 @@ export default function StaffStaticReportPage() {
 
   const renderCard = (template: ReportTemplate) => {
     const done = alreadySubmitted(template.id);
+    const isKendala = template.kind === "issue_quick" || template.category === "Kendala";
     return (
       <button
         key={template.id}
         type="button"
         onClick={() => openForm(template)}
-        className="w-full text-left bg-white border rounded-xl p-4 transition-transform active:scale-[0.98] hover:border-emerald-400"
+        className={cn(
+          "w-full text-left rounded-2xl p-4 transition-transform active:scale-[0.98] border-2 shadow-sm",
+          isKendala
+            ? "bg-amber-50 border-amber-300 hover:border-amber-500"
+            : "bg-white border-emerald-200 hover:border-emerald-500"
+        )}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <h2 className="font-semibold text-slate-900 text-lg">{template.title}</h2>
-              {template.is_required_daily && (
-                <span className="text-xs font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
-                  Wajib
-                </span>
-              )}
-              {done && (
-                <span
-                  className={cn(
-                    "text-xs font-medium px-2 py-0.5 rounded",
-                    done.status_condition === "aman"
-                      ? "bg-emerald-100 text-emerald-800"
-                      : "bg-amber-100 text-amber-800"
-                  )}
-                >
-                  {done.status_condition === "aman"
-                    ? `Selesai ${done.checklist_checked ?? "?"}/${done.checklist_total ?? "?"}`
-                    : "Ada kendala"}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-slate-500 line-clamp-2">
-              {template.standard_result || template.description}
-            </p>
-            <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
-              <span>{template.checklist_items?.length || 0} checklist</span>
-              {template.requires_photo && (
-                <span className="inline-flex items-center gap-1">
-                  <Camera className="h-3 w-3" /> Foto
-                </span>
-              )}
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <h2 className="font-bold text-slate-900 text-lg">{template.title}</h2>
+                {template.is_required_daily && (
+                  <span className="text-xs font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
+                    Wajib
+                  </span>
+                )}
+                {done && (
+                  <span
+                    className={cn(
+                      "text-xs font-medium px-2 py-0.5 rounded",
+                      done.status_condition === "aman"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-amber-100 text-amber-800"
+                    )}
+                  >
+                    {done.status_condition === "aman"
+                      ? `Selesai ${done.checklist_checked ?? "?"}/${done.checklist_total ?? "?"}`
+                      : "Ada kendala"}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-slate-600 line-clamp-2">
+                {template.standard_result || template.description}
+              </p>
+              <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
+                <span>{template.checklist_items?.length || 0} checklist</span>
+                {template.requires_photo && (
+                  <span className="inline-flex items-center gap-1">
+                    <Camera className="h-3 w-3" /> Foto
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-          <span className="text-emerald-700 font-semibold text-sm shrink-0 pt-1">
-            {done ? "Update" : "Isi"} →
-          </span>
+          <div
+            className={cn(
+              "w-full h-12 rounded-xl font-bold text-base flex items-center justify-center gap-2",
+              isKendala
+                ? "bg-amber-500 text-white"
+                : done
+                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                  : "bg-emerald-600 text-white"
+            )}
+          >
+            {isKendala ? "Lapor kendala →" : done ? "Update kegiatan →" : "Isi kegiatan →"}
+          </div>
         </div>
       </button>
     );
@@ -456,6 +512,46 @@ export default function StaffStaticReportPage() {
           </div>
         )}
 
+        {kendalaNotify?.needed && (
+          <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 space-y-3 animate-in fade-in duration-200">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-700 shrink-0 mt-0.5" />
+              <div className="text-sm text-amber-950">
+                <p className="font-bold">Kendala tercatat</p>
+                {kendalaNotify.gas_sent ? (
+                  <p>Leader sudah dikirimi WA otomatis.</p>
+                ) : kendalaNotify.leaders.length > 0 ? (
+                  <p>Ketuk tombol di bawah untuk hubungi Leader via WhatsApp.</p>
+                ) : (
+                  <p>
+                    Belum ada nomor Leader di outlet ini. Minta admin isi role LEADER + WA di
+                    Master Staff.
+                  </p>
+                )}
+              </div>
+            </div>
+            {kendalaNotify.leaders.map((leader) => (
+              <a
+                key={leader.staff_id}
+                href={leader.wa_link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full h-14 rounded-xl bg-[#25D366] text-white font-bold text-base active:scale-[0.98] transition-transform shadow-sm"
+              >
+                <MessageCircle className="h-5 w-5" />
+                WA {leader.name}
+              </a>
+            ))}
+            <button
+              type="button"
+              className="text-xs text-amber-800 underline w-full text-center"
+              onClick={() => setKendalaNotify(null)}
+            >
+              Tutup
+            </button>
+          </div>
+        )}
+
         <div className="bg-white border rounded-xl px-4 py-3 text-sm text-slate-600">
           Centang checklist → foto → pilih kondisi.{" "}
           <span className="font-semibold text-slate-900">
@@ -469,8 +565,15 @@ export default function StaffStaticReportPage() {
             Kegiatan wajib hari ini
           </h2>
           {requiredTemplates.length === 0 ? (
-            <div className="bg-white border rounded-xl p-6 text-center text-slate-500 text-sm">
-              Belum ada kegiatan wajib untuk jabatan Anda.
+            <div className="bg-white border rounded-xl p-5 text-sm text-slate-600 space-y-2">
+              <p className="font-medium text-slate-800">
+                Belum ada kegiatan wajib untuk jabatan &quot;{position}&quot;.
+              </p>
+              <p>
+                Minta admin set posisi ke <strong>Waiters / Bar / Dapur / PA</strong> (atau OB /
+                Klindingan), atau buat template dengan position_group = jabatan Anda di{" "}
+                <span className="font-mono text-xs">Pengaturan → Template Kegiatan</span>.
+              </p>
             </div>
           ) : (
             requiredTemplates.map(renderCard)

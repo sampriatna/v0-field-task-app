@@ -513,7 +513,7 @@ CREATE TABLE report_templates (
   title              VARCHAR(200) NOT NULL,
   category           VARCHAR(50) NOT NULL DEFAULT 'General',
   outlet_id          UUID REFERENCES outlets(id),
-  position_group     VARCHAR(100),  -- Waiters | Bar | Dapur | NULL=semua
+  position_group     VARCHAR(100),  -- Waiters | Bar | Dapur | PA | NULL=semua
   standard_result    TEXT NOT NULL,
   description        TEXT,
   requires_photo     BOOLEAN NOT NULL DEFAULT FALSE,

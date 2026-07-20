@@ -101,11 +101,16 @@ export default function ReportLinksSettingsPage() {
   };
 
   const handleCopy = async (link: StaffReportLink) => {
-    const url = link.report_url || `${window.location.origin}/r/${link.token}`;
+    const url =
+      link.report_url ||
+      `${window.location.origin}/r/${link.short_code || link.token}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(link.id);
-      toast({ title: "Disalin", description: "Link laporan disalin ke clipboard" });
+      toast({
+        title: "Disalin",
+        description: `Link pendek: /r/${link.short_code || "…"}`,
+      });
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
       toast({ title: "Gagal salin", variant: "destructive" });
@@ -149,7 +154,7 @@ export default function ReportLinksSettingsPage() {
               <h2 className="font-semibold">Buat / Generate Link</h2>
             </div>
             <p className="text-sm text-muted-foreground">
-              Setiap staff punya satu link permanen berbasis token aman. Buka tanpa login penuh.
+              Setiap staff punya link pendek dari nama (contoh /r/dul). Statis sampai dinonaktifkan.
             </p>
             <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
               <SelectTrigger>
@@ -189,7 +194,10 @@ export default function ReportLinksSettingsPage() {
           <div className="space-y-3">
             {activeLinks.map((link) => {
               const staff = staffList.find((s) => s.staff_id === link.staff_id);
-              const url = link.report_url || `/r/${link.token}`;
+              const shortPath = `/r/${link.short_code || link.token.slice(0, 8)}`;
+              const url =
+                link.report_url ||
+                `${typeof window !== "undefined" ? window.location.origin : ""}${shortPath}`;
               return (
                 <Card key={link.id}>
                   <CardContent className="p-4 space-y-3">
@@ -205,11 +213,18 @@ export default function ReportLinksSettingsPage() {
                       </div>
                       <Badge>Aktif</Badge>
                     </div>
-                    <p className="text-xs break-all bg-muted rounded-lg p-2 font-mono">{url}</p>
+
+                    <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 space-y-1">
+                      <p className="text-xs text-emerald-800 font-medium">Link pendek (bagi ini)</p>
+                      <p className="text-base font-bold text-emerald-900 font-mono break-all">
+                        {shortPath}
+                      </p>
+                      <p className="text-[11px] text-emerald-700/80 break-all">{url}</p>
+                    </div>
+
                     <div className="flex gap-2">
                       <Button
-                        variant="outline"
-                        className="flex-1"
+                        className="flex-1 h-11"
                         onClick={() => handleCopy(link)}
                       >
                         {copiedId === link.id ? (
@@ -217,11 +232,11 @@ export default function ReportLinksSettingsPage() {
                         ) : (
                           <Copy className="h-4 w-4 mr-1" />
                         )}
-                        Salin
+                        Salin link pendek
                       </Button>
                       <Button
                         variant="destructive"
-                        className="flex-1"
+                        className="flex-1 h-11"
                         onClick={() => setRevokeTarget(link)}
                       >
                         <Ban className="h-4 w-4 mr-1" />

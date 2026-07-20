@@ -48,10 +48,35 @@ Hub: `/settings/daily-activity`
 - **Merah** — belum submit (wajib)
 - **Abu** — tidak wajib
 
+## Position groups
+
+| Group | Mapping jabatan (contoh) |
+|-------|--------------------------|
+| Waiters | waiter, server, floor, kasir |
+| Bar | barista, bar, bartender |
+| Dapur | cook, chef, dapur, kitchen |
+| PA | pa, ob, public area, office boy, klindingan, cleaning, kebersihan |
+
+## PA / OB — Kopi Buri Umah (KBU)
+
+8 kegiatan area-based (bukan “bersih-bersih” generik), masing-masing 10 checklist + wajib foto:
+
+1. Opening Public Area Customer (08:30–10:00)
+2. Toilet Customer Check (09:00–10:00)
+3. Area Makan Customer Check (10:00–12:00)
+4. Halaman & Parkiran Check (10:00–11:30)
+5. Taman, Tanaman & Rumput Kecil (15:00–16:00)
+6. Sampah & Tempat Sampah Check (11:00–12:00)
+7. Mushola / Area Ibadah Check (10:00–11:00)
+8. Closing Public Area Customer (21:00–22:00)
+
+Staff outlet **KBU** dengan posisi PA/OB melihat 8 kegiatan ini. Form menampilkan peringatan foto ketat + panduan catatan (kondisi awal → dikerjakan → akhir → kendala).
+
 ## Demo seed
 
-| Staff | Posisi | Path |
-|-------|--------|------|
-| Rina | Waiters | `/r/b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff0011` |
-| Ani | Bar | `/r/c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff001122` |
-| Budi | Dapur | `/r/a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00` |
+| Staff | Posisi | Short link |
+|-------|--------|------------|
+| Rina | Waiters | `/r/rina` |
+| Ani | Bar | `/r/ani` |
+| Budi | Dapur | `/r/budi` |
+| Dedi | PA (KBU) | `/r/dedi` |
