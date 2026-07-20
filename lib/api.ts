@@ -28,6 +28,13 @@ import type {
   DailyReportFilters,
   DailyReportDashboardData,
   KendalaNotifyInfo,
+  LeaderMonitorFilters,
+  LeaderMonitorDashboardData,
+  LeaderMonitorTemplate,
+  LeaderMonitorSubmission,
+  SubmitLeaderMonitorPayload,
+  ValidateStaffReportPayload,
+  LeaderFollowUpStatus,
 } from "./types";
 import { 
   mockTasks, 
@@ -1523,4 +1530,106 @@ export function buildStaffStaticReportLink(token: string, origin?: string): stri
   const base =
     origin || (typeof window !== "undefined" ? window.location.origin : "");
   return `${base}/r/${token}`;
+}
+
+// =============================================
+// LEADER MONITORING
+// =============================================
+
+async function callLeaderMonitorApi<T>(
+  path: string,
+  options?: { method?: "GET" | "POST" | "PUT"; body?: Record<string, unknown> }
+): Promise<ApiResponse<T>> {
+  try {
+    const method = options?.method || "GET";
+    const response = await fetch(`/api/leader-monitoring${path}`, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: options?.body ? JSON.stringify(options.body) : undefined,
+    });
+
+    if (response.status === 401) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return { success: false, error: "Sesi telah berakhir. Silakan login kembali." };
+    }
+
+    const text = await response.text();
+    let result: ApiResponse<T>;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      return { success: false, error: "Server mengembalikan respons yang tidak valid." };
+    }
+    return { success: Boolean(result.success), data: result.data as T, error: result.error };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal menghubungi server",
+    };
+  }
+}
+
+export async function getLeaderMonitorDashboard(
+  filters?: LeaderMonitorFilters
+): Promise<ApiResponse<LeaderMonitorDashboardData>> {
+  const params = new URLSearchParams();
+  if (filters?.date) params.set("date", filters.date);
+  if (filters?.outlet) params.set("outlet", filters.outlet);
+  if (filters?.kind) params.set("kind", filters.kind);
+  if (filters?.follow_up) params.set("follow_up", filters.follow_up);
+  const qs = params.toString();
+  return callLeaderMonitorApi(`/dashboard${qs ? `?${qs}` : ""}`);
+}
+
+export async function getLeaderMonitorTemplates(
+  outlet?: string
+): Promise<ApiResponse<LeaderMonitorTemplate[]>> {
+  const qs = outlet ? `?outlet=${encodeURIComponent(outlet)}` : "";
+  return callLeaderMonitorApi(`/templates${qs}`);
+}
+
+export async function submitLeaderMonitorCheck(
+  payload: SubmitLeaderMonitorPayload
+): Promise<ApiResponse<LeaderMonitorSubmission>> {
+  return callLeaderMonitorApi("/submit", {
+    method: "POST",
+    body: payload as unknown as Record<string, unknown>,
+  });
+}
+
+export async function validateStaffDailyReport(
+  payload: ValidateStaffReportPayload
+): Promise<ApiResponse<DailyReportSubmission>> {
+  return callLeaderMonitorApi("/validate", {
+    method: "POST",
+    body: payload as unknown as Record<string, unknown>,
+  });
+}
+
+export async function updateLeaderFollowUp(
+  id: string,
+  follow_up_status: LeaderFollowUpStatus,
+  extra?: { problem_note?: string; fix_instruction?: string }
+): Promise<ApiResponse<LeaderMonitorSubmission>> {
+  return callLeaderMonitorApi("/follow-up", {
+    method: "POST",
+    body: { id, follow_up_status, ...extra },
+  });
+}
+
+export async function getLeaderStaffOptions(
+  outlet?: string,
+  staff?: Staff[]
+): Promise<
+  ApiResponse<{ staff_id: string; name: string; position: string; outlet: string }[]>
+> {
+  if (staff?.length) {
+    return callLeaderMonitorApi("/staff-options", {
+      method: "POST",
+      body: { staff, outlet },
+    });
+  }
+  const qs = outlet ? `?outlet=${encodeURIComponent(outlet)}` : "";
+  return callLeaderMonitorApi(`/staff-options${qs}`);
 }

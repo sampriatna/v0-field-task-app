@@ -234,6 +234,25 @@ export default function SettingsPage() {
           </Card>
         </Link>
 
+        <Link href="/dashboard/leader-monitoring">
+          <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer border-slate-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Leader Monitoring</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Kontrol lapangan: Opening, Jam Ramai, Spot Check, Closing, Issue Log
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </Card>
+        </Link>
+
         {/* Manajemen User Login */}
         <Link href="/settings/users">
           <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer">

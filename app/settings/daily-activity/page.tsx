@@ -90,6 +90,23 @@ export default function DailyActivityAdminPage() {
           </Card>
         </Link>
 
+        <Link href="/dashboard/leader-monitoring">
+          <Card className="mb-3 hover:border-primary/50 transition-colors active:scale-[0.99] border-slate-300">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="w-11 h-11 rounded-lg bg-slate-800 flex items-center justify-center shrink-0">
+                <Layers className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold">Leader Monitoring</h3>
+                <p className="text-sm text-muted-foreground">
+                  Cek fisik: Opening, Jam Ramai, Spot Check, Closing, Issue Log
+                </p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </CardContent>
+          </Card>
+        </Link>
+
         <Card>
           <CardContent className="p-4 space-y-2 text-sm text-muted-foreground">
             <div className="flex items-center gap-2 font-medium text-foreground">

@@ -82,6 +82,11 @@ function labelMeta(label: DailyReportRowLabel): {
       return { text: "Belum submit", className: "bg-red-100 text-red-800 border-red-200" };
     case "tidak_wajib":
       return { text: "Tidak wajib", className: "bg-slate-100 text-slate-600 border-slate-200" };
+    case "perlu_perbaikan":
+      return {
+        text: "Perlu perbaikan (leader)",
+        className: "bg-orange-100 text-orange-900 border-orange-300",
+      };
   }
 }
 
@@ -189,9 +194,24 @@ export default function DailyReportsDashboardPage() {
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="px-2 py-1 rounded border bg-emerald-100 text-emerald-800">Hijau: selesai lengkap</span>
           <span className="px-2 py-1 rounded border bg-amber-100 text-amber-900">Kuning: ada kendala</span>
+          <span className="px-2 py-1 rounded border bg-orange-100 text-orange-900">Oranye: perlu perbaikan leader</span>
           <span className="px-2 py-1 rounded border bg-red-100 text-red-800">Merah: belum submit</span>
           <span className="px-2 py-1 rounded border bg-slate-100 text-slate-600">Abu: tidak wajib</span>
         </div>
+
+        <Card className="border-slate-300 bg-slate-50">
+          <CardContent className="p-3 text-sm flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+            <p className="text-slate-700">
+              Submit staff belum tentu benar. Validasi lapangan di{" "}
+              <strong>Leader Monitoring</strong>.
+            </p>
+            <Link href="/dashboard/leader-monitoring">
+              <Button size="sm" variant="outline">
+                Buka Leader Monitoring
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
 
         <div className="grid grid-cols-2 gap-3">
           <Card className="bg-slate-50 border-slate-200">
@@ -439,6 +459,7 @@ export default function DailyReportsDashboardPage() {
                     key={`${row.staff_id}-${row.report_template_id}`}
                     row={row}
                     staffList={staffList}
+                    onValidated={() => load(true)}
                   />
                 ))}
               </div>
@@ -565,9 +586,11 @@ function RowDesktop({
 function RowMobile({
   row,
   staffList,
+  onValidated,
 }: {
   row: DailyReportDashboardRow;
   staffList: Staff[];
+  onValidated?: () => void;
 }) {
   const meta = labelMeta(row.label);
   const waLinks = leaderWaLinks(row, staffList);
@@ -576,7 +599,8 @@ function RowMobile({
       className={cn(
         row.label === "belum_submit" && "border-red-200 bg-red-50/40",
         row.label === "selesai_kendala" && "border-amber-200 bg-amber-50/40",
-        row.label === "selesai_lengkap" && "border-emerald-200 bg-emerald-50/30"
+        row.label === "selesai_lengkap" && "border-emerald-200 bg-emerald-50/30",
+        row.label === "perlu_perbaikan" && "border-orange-300 bg-orange-50/50"
       )}
     >
       <CardContent className="p-4 space-y-2">
@@ -608,6 +632,15 @@ function RowMobile({
           <span className="text-muted-foreground">Kondisi: </span>
           {conditionLabel(row.status_condition)}
         </p>
+        {row.submission?.leader_validation && (
+          <p className="text-sm">
+            <span className="text-muted-foreground">Validasi leader: </span>
+            <span className="font-semibold uppercase">{row.submission.leader_validation}</span>
+            {row.submission.leader_validation_note
+              ? ` — ${row.submission.leader_validation_note}`
+              : ""}
+          </p>
+        )}
         {row.note && (
           <p className="text-sm">
             <span className="text-muted-foreground">Catatan: </span>
@@ -625,6 +658,12 @@ function RowMobile({
             Lihat foto
           </a>
         )}
+        {row.submitted && row.submission?.id && (
+          <ValidateStaffButtons
+            submissionId={row.submission.id}
+            onDone={onValidated}
+          />
+        )}
         {waLinks.map((l) => (
           <a
             key={l.href}
@@ -639,5 +678,109 @@ function RowMobile({
         ))}
       </CardContent>
     </Card>
+  );
+}
+
+function ValidateStaffButtons({
+  submissionId,
+  onDone,
+}: {
+  submissionId: string;
+  onDone?: () => void;
+}) {
+  const { toast } = useToast();
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+
+  const run = async (validation: "valid" | "revisi" | "tidak_valid" | "manipulasi") => {
+    if (validation !== "valid" && !note.trim()) {
+      alert("Isi catatan singkat dulu (wajib untuk revisi / tidak valid).");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { validateStaffDailyReport } = await import("@/lib/api");
+      const res = await validateStaffDailyReport({
+        submission_id: submissionId,
+        validation,
+        note,
+      });
+      if (res.success) {
+        toast({ title: "Validasi tersimpan", description: validation });
+        setOpen(false);
+        onDone?.();
+      } else {
+        toast({ title: "Gagal", description: res.error, variant: "destructive" });
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full h-11"
+        onClick={() => setOpen(true)}
+      >
+        Validasi lapangan
+      </Button>
+    );
+  }
+
+  return (
+    <div className="space-y-2 border rounded-xl p-3 bg-white">
+      <p className="text-xs font-semibold text-slate-700">
+        Cek fisik dulu. Pilih hasil:
+      </p>
+      <Input
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Catatan leader (wajib jika revisi)"
+        className="h-10 text-sm"
+      />
+      <div className="grid grid-cols-2 gap-1.5">
+        <Button type="button" size="sm" disabled={busy} onClick={() => run("valid")}>
+          Valid
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          onClick={() => run("revisi")}
+        >
+          Revisi
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="destructive"
+          disabled={busy}
+          onClick={() => run("tidak_valid")}
+        >
+          Tidak valid
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="destructive"
+          disabled={busy}
+          onClick={() => run("manipulasi")}
+        >
+          Manipulasi
+        </Button>
+      </div>
+      <button
+        type="button"
+        className="text-xs text-muted-foreground underline w-full"
+        onClick={() => setOpen(false)}
+      >
+        Batal
+      </button>
+    </div>
   );
 }
