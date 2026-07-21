@@ -153,6 +153,7 @@ async function forwardToGas(
         headers: { 
           "Content-Type": "application/json",
         },
+        signal: AbortSignal.timeout(22_000),
       });
     } else {
       // POST request - send action in body along with payload
@@ -167,6 +168,7 @@ async function forwardToGas(
           "Content-Type": "application/json",
         },
         body: JSON.stringify(bodyData),
+        signal: AbortSignal.timeout(22_000),
       });
     }
 
@@ -238,9 +240,20 @@ async function forwardToGas(
     }
   } catch (error) {
     console.error("GAS API Error:", error);
+    const timedOut =
+      error instanceof Error &&
+      (error.name === "TimeoutError" ||
+        error.name === "AbortError" ||
+        error.message.toLowerCase().includes("timeout") ||
+        error.message.toLowerCase().includes("aborted"));
     return NextResponse.json(
-      { success: false, error: "Gagal menghubungi server GAS" },
-      { status: 500 }
+      {
+        success: false,
+        error: timedOut
+          ? "GAS terlalu lama merespons (timeout). Coba refresh."
+          : "Gagal menghubungi server GAS",
+      },
+      { status: timedOut ? 504 : 500 }
     );
   }
 }

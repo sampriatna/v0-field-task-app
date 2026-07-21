@@ -265,25 +265,35 @@ export function buildReportLink(taskId: string, token: string, origin?: string):
 async function callApi<T>(
   action: string,
   payload?: Record<string, unknown>,
-  method: "GET" | "POST" = "POST"
+  method: "GET" | "POST" = "POST",
+  options?: { timeoutMs?: number }
 ): Promise<ApiResponse<T>> {
   try {
     let response: Response;
+    const timeoutMs = options?.timeoutMs ?? 25_000;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    if (method === "GET") {
-      const params = new URLSearchParams({ action, ...payload } as Record<string, string>);
-      response = await fetch(`${API_BASE}?${params.toString()}`, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-      });
-    } else {
-      response = await fetch(API_BASE, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ action, ...payload }),
-      });
+    try {
+      if (method === "GET") {
+        const params = new URLSearchParams({ action, ...payload } as Record<string, string>);
+        response = await fetch(`${API_BASE}?${params.toString()}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          signal: controller.signal,
+        });
+      } else {
+        response = await fetch(API_BASE, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ action, ...payload }),
+          signal: controller.signal,
+        });
+      }
+    } finally {
+      clearTimeout(timer);
     }
 
     // Handle 401 - redirect to login
@@ -335,9 +345,16 @@ async function callApi<T>(
     return { success: result.success, data: result.data as T };
   } catch (error) {
     console.error("API Error:", error);
+    const aborted =
+      error instanceof Error &&
+      (error.name === "AbortError" || error.message.includes("aborted"));
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Terjadi kesalahan saat menghubungi server",
+      error: aborted
+        ? "Koneksi ke server terlalu lama. Coba refresh."
+        : error instanceof Error
+          ? error.message
+          : "Terjadi kesalahan saat menghubungi server",
     };
   }
 }
