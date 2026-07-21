@@ -17,6 +17,8 @@ interface DashboardSummaryCardsProps {
   summary: DashboardSummary;
   isLoading?: boolean;
   onStatusClick?: (status: string) => void;
+  /** Status filter aktif (OPEN / SUBMITTED / …) untuk highlight kartu */
+  activeStatus?: string;
 }
 
 interface SummaryCard {
@@ -76,6 +78,7 @@ export function DashboardSummaryCards({
   summary,
   isLoading = false,
   onStatusClick,
+  activeStatus,
 }: DashboardSummaryCardsProps) {
   if (isLoading) {
     return (
@@ -95,9 +98,13 @@ export function DashboardSummaryCards({
     );
   }
 
+  const activeKey = (activeStatus || "ALL").toLowerCase();
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      {cards.map((card) => (
+      {cards.map((card) => {
+        const isActive = card.key !== "total" && activeKey === card.key;
+        return (
         <div
           key={card.key}
           onClick={() => {
@@ -107,7 +114,8 @@ export function DashboardSummaryCards({
           }}
           className={cn(
             "cursor-pointer transition-all hover:shadow-md rounded-lg",
-            card.key !== "total" && "hover:border-slate-400"
+            card.key !== "total" && "hover:border-slate-400",
+            isActive && "ring-2 ring-primary ring-offset-1"
           )}
           role="button"
           tabIndex={card.key !== "total" ? 0 : -1}
@@ -118,7 +126,7 @@ export function DashboardSummaryCards({
           }}
         >
           <Card
-            className={cn("p-3 border", card.className)}
+            className={cn("p-3 border", card.className, isActive && "border-primary")}
           >
             <div className="flex items-center gap-2 mb-1">
               <span className={card.textClass}>{card.icon}</span>
@@ -131,7 +139,8 @@ export function DashboardSummaryCards({
             </p>
           </Card>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -141,6 +150,7 @@ interface ChecklistSummaryCardsProps {
   summary: ChecklistSummary;
   isLoading?: boolean;
   onStatusClick?: (status: string) => void;
+  activeStatus?: string;
 }
 
 const checklistCards: SummaryCard[] = [
@@ -192,6 +202,7 @@ export function ChecklistSummaryCards({
   summary,
   isLoading = false,
   onStatusClick,
+  activeStatus,
 }: ChecklistSummaryCardsProps) {
   if (isLoading) {
     return (
@@ -208,9 +219,13 @@ export function ChecklistSummaryCards({
     );
   }
 
+  const activeKey = (activeStatus || "ALL").toLowerCase();
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-      {checklistCards.map((card) => (
+      {checklistCards.map((card) => {
+        const isActive = card.key !== "total" && activeKey === card.key;
+        return (
         <div
           key={card.key}
           onClick={() => {
@@ -220,7 +235,8 @@ export function ChecklistSummaryCards({
           }}
           className={cn(
             "cursor-pointer transition-all hover:shadow-md rounded-lg",
-            card.key !== "total" && "hover:border-slate-400"
+            card.key !== "total" && "hover:border-slate-400",
+            isActive && "ring-2 ring-primary ring-offset-1"
           )}
           role="button"
           tabIndex={card.key !== "total" ? 0 : -1}
@@ -231,7 +247,7 @@ export function ChecklistSummaryCards({
           }}
         >
           <Card
-            className={cn("p-3 border", card.className)}
+            className={cn("p-3 border", card.className, isActive && "border-primary")}
           >
             <div className="flex items-center gap-2 mb-1">
               <span className={card.textClass}>{card.icon}</span>
@@ -244,7 +260,8 @@ export function ChecklistSummaryCards({
             </p>
           </Card>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
