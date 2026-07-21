@@ -32,6 +32,28 @@ const statusOptions: { value: TaskStatus | "ALL"; label: string }[] = [
   { value: "REVISI", label: "Perlu Revisi" },
 ];
 
+/** Map kunci kartu summary (open/submitted/...) → status filter Select */
+function summaryKeyToStatus(key: string): TaskStatus | "ALL" {
+  const map: Record<string, TaskStatus | "ALL"> = {
+    open: "OPEN",
+    submitted: "SUBMITTED",
+    done: "DONE",
+    late: "LATE",
+    revisi: "REVISI",
+    ALL: "ALL",
+    OPEN: "OPEN",
+    SUBMITTED: "SUBMITTED",
+    DONE: "DONE",
+    LATE: "LATE",
+    REVISI: "REVISI",
+  };
+  return map[key] || map[key.toUpperCase()] || "ALL";
+}
+
+function statusFilterLabel(status: TaskStatus | "ALL"): string {
+  return statusOptions.find((o) => o.value === status)?.label || String(status);
+}
+
 type TimePeriod = "today" | "week" | "month";
 
 // Helper function to check if task matches the filtered status
@@ -306,12 +328,15 @@ export default function DashboardPage() {
     setTimePeriod("today"); // Reset to today
   };
 
-  const handleStatusClick = (status: TaskStatus | "ALL") => {
-    // Toggle: if same status clicked, reset to ALL; otherwise set new status
+  const handleStatusClick = (statusKey: string) => {
+    const status = summaryKeyToStatus(statusKey);
+    // Toggle: klik status yang sama → reset; selain itu set filter + buka panel
     if (selectedStatus === status) {
       setSelectedStatus("ALL");
     } else {
       setSelectedStatus(status);
+      setShowFilters(true);
+      setCurrentPage(1);
     }
   };
 
@@ -434,6 +459,7 @@ export default function DashboardPage() {
               summary={summary} 
               isLoading={isLoading}
               onStatusClick={handleStatusClick}
+              activeStatus={selectedStatus}
             />
 
             {/* Search and Filter Bar */}
@@ -448,10 +474,11 @@ export default function DashboardPage() {
                 />
               </div>
               <Button
-                variant={showFilters ? "secondary" : "outline"}
+                variant={showFilters || hasActiveFilters ? "secondary" : "outline"}
                 size="icon"
                 onClick={() => setShowFilters(!showFilters)}
                 className="shrink-0"
+                title="Filter"
               >
                 <Filter className="w-4 h-4" />
               </Button>
@@ -472,8 +499,25 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            {/* Filter Panel */}
-            {showFilters && (
+            {/* Chip filter aktif — selalu kelihatan & bisa diklik meski panel tertutup */}
+            {selectedStatus !== "ALL" && !showFilters && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(true)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary"
+                >
+                  Status: {statusFilterLabel(selectedStatus)}
+                </button>
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-muted-foreground">
+                  <X className="w-3.5 h-3.5 mr-1" />
+                  Reset
+                </Button>
+              </div>
+            )}
+
+            {/* Filter Panel — muncul otomatis saat kartu Open/Submitted diklik */}
+            {(showFilters || hasActiveFilters) && (
               <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
                 {/* Time Period Selector */}
                 <div className="flex gap-1 bg-card rounded p-1">
@@ -522,7 +566,7 @@ export default function DashboardPage() {
                   value={selectedStatus}
                   onValueChange={(v) => setSelectedStatus(v as TaskStatus | "ALL")}
                 >
-                  <SelectTrigger className="w-[140px] bg-card">
+                  <SelectTrigger className="w-[160px] bg-card">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -615,6 +659,7 @@ export default function DashboardPage() {
               summary={checklistSummary} 
               isLoading={isLoading}
               onStatusClick={handleStatusClick}
+              activeStatus={selectedStatus}
             />
 
             {/* Search and Filter Bar */}
@@ -629,17 +674,34 @@ export default function DashboardPage() {
                 />
               </div>
               <Button
-                variant={showFilters ? "secondary" : "outline"}
+                variant={showFilters || hasActiveFilters ? "secondary" : "outline"}
                 size="icon"
                 onClick={() => setShowFilters(!showFilters)}
                 className="shrink-0"
+                title="Filter"
               >
                 <Filter className="w-4 h-4" />
               </Button>
             </div>
 
+            {selectedStatus !== "ALL" && !showFilters && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(true)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary"
+                >
+                  Status: {statusFilterLabel(selectedStatus)}
+                </button>
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-muted-foreground">
+                  <X className="w-3.5 h-3.5 mr-1" />
+                  Reset
+                </Button>
+              </div>
+            )}
+
             {/* Filter Panel */}
-            {showFilters && (
+            {(showFilters || hasActiveFilters) && (
               <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
                 {/* Time Period Selector */}
                 <div className="flex gap-1 bg-card rounded p-1">
@@ -688,7 +750,7 @@ export default function DashboardPage() {
                   value={selectedStatus}
                   onValueChange={(v) => setSelectedStatus(v as TaskStatus | "ALL")}
                 >
-                  <SelectTrigger className="w-[140px] bg-card">
+                  <SelectTrigger className="w-[160px] bg-card">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
