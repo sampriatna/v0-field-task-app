@@ -52,10 +52,23 @@ Hub: `/settings/daily-activity`
 
 | Group | Mapping jabatan (contoh) |
 |-------|--------------------------|
-| Waiters | waiter, server, floor, kasir |
+| Waiters | waiter, server, floor, pramusaji |
 | Bar | barista, bar, bartender |
 | Dapur | cook, chef, dapur, kitchen |
-| PA | pa, ob, public area, office boy, klindingan, cleaning, kebersihan |
+| PA | pa, ob, public area, office boy, klindingan, cleaning |
+| Kasir | kasir, cashier |
+| Purchasing | purchasing, pembelian |
+| Gudang | gudang, warehouse |
+| ProduksiFnB / ProduksiNF | produksi fnb / produksi nf |
+| Advertising | advertising, marketing |
+| AdminMP | admin mp |
+| CSNF | cs nf, customer service |
+| Finance | finance, keuangan |
+| Design | design, editor |
+
+Sumber seed + mapping posisi: **nusafood-v2** (di-port ke v1 agar bisa dipakai dulu tanpa cutover Postgres).
+
+Admin: **Pengaturan → Daily Activity** → tombol *Seed Template Kegiatan* + *Normalisasi Jabatan Staff*.
 
 ## PA / OB — Kopi Buri Umah (KBU)
 

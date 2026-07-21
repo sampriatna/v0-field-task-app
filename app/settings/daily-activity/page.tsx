@@ -11,6 +11,8 @@ import {
   Info,
   Layers,
 } from "lucide-react";
+import { DailyActivitySeedButton } from "@/components/daily-activity-seed-button";
+import { StaffPositionNormalizeButton } from "@/components/staff-position-normalize-button";
 
 /**
  * Super Admin hub untuk Daily Activity SOP.
@@ -35,9 +37,16 @@ export default function DailyActivityAdminPage() {
                 <strong>Daily Activity:</strong> kegiatan standar harian per SDM via link
                 pribadi — checklist + foto + status. Tidak perlu dikirim WA tiap hari.
               </p>
+              <p>
+                Template seed + posisi jabatan diselaraskan dari{" "}
+                <strong>nusafood-v2</strong> supaya v1 bisa dipakai dulu.
+              </p>
             </div>
           </CardContent>
         </Card>
+
+        <DailyActivitySeedButton />
+        <StaffPositionNormalizeButton />
 
         <Link href="/settings/report-templates">
           <Card className="mb-3 hover:border-primary/50 transition-colors active:scale-[0.99]">
@@ -114,10 +123,11 @@ export default function DailyActivityAdminPage() {
               Cara pakai cepat
             </div>
             <ol className="list-decimal list-inside space-y-1">
-              <li>Edit / tambah template kegiatan + checklist</li>
+              <li>Seed template kegiatan (tombol di atas)</li>
+              <li>Normalisasi jabatan staff ke posisi standar</li>
               <li>Generate link untuk tiap staff aktif</li>
               <li>Bagikan link (satu kali) — staff pakai tiap hari</li>
-              <li>Pantau di Dashboard Audit</li>
+              <li>Pantau di Dashboard Audit + Leader Monitoring</li>
             </ol>
           </CardContent>
         </Card>

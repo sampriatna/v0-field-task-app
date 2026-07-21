@@ -570,9 +570,9 @@ export default function StaffStaticReportPage() {
                 Belum ada kegiatan wajib untuk jabatan &quot;{position}&quot;.
               </p>
               <p>
-                Minta admin set posisi ke <strong>Waiters / Bar / Dapur / PA</strong> (atau OB /
-                Klindingan), atau buat template dengan position_group = jabatan Anda di{" "}
-                <span className="font-mono text-xs">Pengaturan → Template Kegiatan</span>.
+                Minta admin set posisi ke jabatan standar (Waiters / Bar / Dapur / PA /
+                Kasir / dll.), atau jalankan <strong>Seed Template</strong> +{" "}
+                <strong>Normalisasi Jabatan</strong> di Pengaturan → Daily Activity.
               </p>
             </div>
           ) : (

@@ -581,7 +581,12 @@ export const REPORT_CONDITION_OPTIONS: {
   { value: "perlu_belanja", label: "Perlu belanja/perbaikan", requiresNote: true },
 ];
 
-export const REPORT_POSITION_GROUPS = ["Waiters", "Bar", "Dapur", "PA"] as const;
+export {
+  REPORT_POSITION_GROUPS,
+  POSITION_GROUP_LABELS,
+  getPositionGroupLabel,
+  type ReportPositionGroup,
+} from "./position-groups";
 
 // =============================================
 // LEADER MONITORING (kontrol lapangan di atas Daily Report)
