@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useLayoutEffect } from "react";
 import { MobileHeader } from "@/components/mobile-header";
 import { DashboardSummaryCards, ChecklistSummaryCards } from "@/components/dashboard-summary";
 import { TaskCard, TaskCardSkeleton } from "@/components/task-card";
@@ -22,6 +22,10 @@ import type { Task, DashboardSummary, TaskStatus, Outlet, ChecklistReport, Check
 import { outlets } from "@/lib/mock-data";
 import { StatusBadge } from "@/components/status-badge";
 import { useToast } from "@/hooks/use-toast";
+import {
+  readDashboardCache,
+  writeDashboardCache,
+} from "@/lib/dashboard-cache";
 
 const statusOptions: { value: TaskStatus | "ALL"; label: string }[] = [
   { value: "ALL", label: "Semua Status" },
@@ -168,9 +172,7 @@ export default function DashboardPage() {
   const [currentPage, setCurrentPage] = useState(1); // Pagination: 1-indexed
   const itemsPerPage = 10;
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Calculate summary from tasks array to ensure consistency
   const calculateTaskSummary = (taskList: Task[]): DashboardSummary => {
@@ -211,40 +213,91 @@ export default function DashboardPage() {
     };
   };
 
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const applyTasks = (taskList: Task[]) => {
+    setTasks(taskList);
+    setSummary(calculateTaskSummary(taskList));
+    setChecklistSummary(calculateChecklistSummary(taskList));
+  };
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (opts?: { soft?: boolean }) => {
     setLoadError(null);
 
+    const cached = readDashboardCache();
+    const hasCache = Boolean(cached?.tasks?.length || cached?.checklists?.length);
+
+    // Paint instan dari cache — jangan skeleton penuh
+    if (hasCache && cached) {
+      applyTasks(cached.tasks);
+      setChecklists(cached.checklists || []);
+      setIsLoading(false);
+      setIsRefreshing(true);
+    } else if (!opts?.soft) {
+      setIsLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+
     try {
-      const tasksResult = await getTasks();
+      // Parallel — jangan tunggu getTasks selesai baru checklist
+      const [tasksResult, checklistsResult] = await Promise.all([
+        getTasks(),
+        getChecklistReports(),
+      ]);
+
+      let nextTasks: Task[] = [];
+      let nextChecklists: ChecklistReport[] = [];
 
       if (tasksResult.success && tasksResult.data) {
-        setTasks(tasksResult.data);
-        setSummary(calculateTaskSummary(tasksResult.data));
-        setChecklistSummary(calculateChecklistSummary(tasksResult.data));
-      } else {
+        nextTasks = tasksResult.data;
+        applyTasks(nextTasks);
+      } else if (!hasCache) {
         setTasks([]);
         setLoadError(tasksResult.error || "Gagal memuat tugas");
+      } else {
+        setLoadError(tasksResult.error || "Gagal refresh — menampilkan data cache");
       }
 
-      // Load checklists separately (non-blocking)
-      try {
-        const checklistsResult = await getChecklistReports();
-        if (checklistsResult.success && checklistsResult.data) {
-          setChecklists(checklistsResult.data);
-        }
-      } catch {
-        // Checklist error is non-fatal
+      if (checklistsResult.success && checklistsResult.data) {
+        nextChecklists = checklistsResult.data;
+        setChecklists(nextChecklists);
+      }
+
+      if (tasksResult.success && tasksResult.data) {
+        writeDashboardCache(
+          nextTasks,
+          checklistsResult.success && checklistsResult.data
+            ? checklistsResult.data
+            : cached?.checklists || []
+        );
       }
     } catch (error) {
-      setLoadError(error instanceof Error ? error.message : "Gagal memuat data");
-      setTasks([]);
+      if (!hasCache) {
+        setLoadError(error instanceof Error ? error.message : "Gagal memuat data");
+        setTasks([]);
+      } else {
+        setLoadError(
+          error instanceof Error
+            ? `${error.message} — menampilkan data cache`
+            : "Gagal refresh — menampilkan data cache"
+        );
+      }
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
+
+  useLayoutEffect(() => {
+    // Hydrate dari cache sebelum paint — hindari skeleton lama
+    const cached = readDashboardCache();
+    if (cached?.tasks?.length || cached?.checklists?.length) {
+      applyTasks(cached.tasks || []);
+      setChecklists(cached.checklists || []);
+      setIsLoading(false);
+    }
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Filter tasks: manual tasks (non-checklist) and checklist tasks
   const manualTasks = tasks.filter(t => t.checklist_mode !== "YES");
@@ -313,12 +366,7 @@ export default function DashboardPage() {
   const hasActiveFilters = selectedOutlet !== "ALL" || selectedStatus !== "ALL" || searchQuery !== "" || timePeriod !== "today";
 
   const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await loadData();
-    } finally {
-      setIsRefreshing(false);
-    }
+    await loadData({ soft: true });
   };
 
   const clearFilters = () => {
@@ -352,11 +400,22 @@ export default function DashboardPage() {
     });
   };
 
+  // Skeleton hanya jika belum ada data sama sekali
+  const showSkeleton = isLoading && tasks.length === 0;
+
   return (
     <div className="min-h-screen bg-background">
       <MobileHeader title="Dashboard" showSettings />
 
       <div className="p-4 space-y-4 max-w-5xl mx-auto">
+        {/* Soft refresh indicator */}
+        {isRefreshing && !isLoading && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-2">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+            Memperbarui data dari server…
+          </div>
+        )}
+
         {/* Error Alert */}
         {loadError && tasks.length > 0 && (
           <Card className="bg-red-50 border-red-200">
@@ -457,7 +516,7 @@ export default function DashboardPage() {
             {/* Task Summary Cards */}
             <DashboardSummaryCards 
               summary={summary} 
-              isLoading={isLoading}
+              isLoading={showSkeleton}
               onStatusClick={handleStatusClick}
               activeStatus={selectedStatus}
             />
@@ -598,7 +657,7 @@ export default function DashboardPage() {
                 </h2>
               </div>
 
-              {isLoading ? (
+              {showSkeleton ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
                     <TaskCardSkeleton key={i} />
@@ -657,7 +716,7 @@ export default function DashboardPage() {
             {/* Checklist Summary Cards */}
             <ChecklistSummaryCards 
               summary={checklistSummary} 
-              isLoading={isLoading}
+              isLoading={showSkeleton}
               onStatusClick={handleStatusClick}
               activeStatus={selectedStatus}
             />
@@ -782,7 +841,7 @@ export default function DashboardPage() {
                 </h2>
               </div>
 
-              {isLoading ? (
+              {showSkeleton ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
                     <TaskCardSkeleton key={i} />
