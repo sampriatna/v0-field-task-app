@@ -1532,6 +1532,56 @@ export function buildStaffStaticReportLink(token: string, origin?: string): stri
   return `${base}/r/${token}`;
 }
 
+/** Seed / upsert template kegiatan harian (port dari nusafood-v2). */
+export async function seedDailyActivityTemplatesApi(): Promise<
+  ApiResponse<{ templates: number; codes: string[]; position_groups: string[] }>
+> {
+  return callStaffReportApi("/templates/seed", { method: "POST" });
+}
+
+/** Normalisasi jabatan staff → posisi standar. */
+export async function normalizeStaffPositionsApi(
+  staff?: Staff[]
+): Promise<
+  ApiResponse<{
+    total: number;
+    updated: number;
+    unchanged: number;
+    unresolved: { staff_id: string; name: string; position: string | null }[];
+    updated_staff: Staff[];
+  }>
+> {
+  try {
+    const response = await fetch("/api/staff/normalize-positions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ staff: staff || [] }),
+    });
+    if (response.status === 401) {
+      if (typeof window !== "undefined") window.location.href = "/login";
+      return { success: false, error: "Sesi telah berakhir. Silakan login kembali." };
+    }
+    const result = (await response.json()) as ApiResponse<{
+      total: number;
+      updated: number;
+      unchanged: number;
+      unresolved: { staff_id: string; name: string; position: string | null }[];
+      updated_staff: Staff[];
+    }>;
+    return {
+      success: Boolean(result.success),
+      data: result.data,
+      error: result.error,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Gagal normalisasi",
+    };
+  }
+}
+
 // =============================================
 // LEADER MONITORING
 // =============================================

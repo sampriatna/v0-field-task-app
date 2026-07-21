@@ -37,8 +37,9 @@ import type {
   ReportTemplateCategory,
   ReportTemplateKind,
 } from "@/lib/types";
-import { REPORT_POSITION_GROUPS } from "@/lib/types";
+import { REPORT_POSITION_GROUPS, POSITION_GROUP_LABELS } from "@/lib/types";
 import { Plus, Pencil, FileText, Trash2 } from "lucide-react";
+import { DailyActivitySeedButton } from "@/components/daily-activity-seed-button";
 
 const categories: ReportTemplateCategory[] = [
   "Cleaning",
@@ -207,10 +208,13 @@ export default function ReportTemplatesSettingsPage() {
               Checklist + standar hasil + foto — bukan laporan bebas
             </p>
           </div>
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-1" />
-            Tambah
-          </Button>
+          <div className="flex items-center gap-2">
+            <DailyActivitySeedButton compact onDone={load} />
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4 mr-1" />
+              Tambah
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -318,7 +322,7 @@ export default function ReportTemplatesSettingsPage() {
                     <SelectItem value="ALL">Semua</SelectItem>
                     {REPORT_POSITION_GROUPS.map((g) => (
                       <SelectItem key={g} value={g}>
-                        {g === "PA" ? "PA / OB (Public Area)" : g}
+                        {POSITION_GROUP_LABELS[g] || g}
                       </SelectItem>
                     ))}
                   </SelectContent>
