@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Search, Filter, X, RefreshCw, ListChecks, ClipboardList, ChevronRight, AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Plus, Search, X, RefreshCw, ListChecks, ClipboardList, ChevronRight, AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { getTasks, getChecklistReports } from "@/lib/api";
 import type { Task, DashboardSummary, TaskStatus, Outlet, ChecklistReport, ChecklistSummary } from "@/lib/types";
@@ -54,10 +54,6 @@ function summaryKeyToStatus(key: string): TaskStatus | "ALL" {
   return map[key] || map[key.toUpperCase()] || "ALL";
 }
 
-function statusFilterLabel(status: TaskStatus | "ALL"): string {
-  return statusOptions.find((o) => o.value === status)?.label || String(status);
-}
-
 type TimePeriod = "today" | "week" | "month";
 
 // Helper function to check if task matches the filtered status
@@ -87,52 +83,78 @@ function matchesStatusFilter(task: Task, selectedStatus: TaskStatus | "ALL"): bo
   }
 }
 
-// Helper function to extract date portion from deadline (YYYY-MM-DD)
-function getTaskDate(deadline: string): string {
-  const date = new Date(deadline);
-  if (isNaN(date.getTime())) return "";
-  return date.toISOString().split("T")[0];
-}
-
-// Get today's date in YYYY-MM-DD format (local timezone)
-function getTodayDate(): string {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
+// Helper: parse ke tanggal lokal YYYY-MM-DD (jangan pakai toISOString — itu UTC)
+function toLocalYmd(input: string | Date | undefined | null): string {
+  if (!input) return "";
+  const date = input instanceof Date ? input : new Date(input);
+  if (isNaN(date.getTime())) {
+    // fallback: ambil prefix YYYY-MM-DD dari string mentah
+    const m = String(input).match(/^(\d{4}-\d{2}-\d{2})/);
+    return m ? m[1] : "";
+  }
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
-// Check if a date is within the selected time period
-function isWithinTimePeriod(deadline: string, period: TimePeriod): boolean {
+function getTodayDate(): string {
+  return toLocalYmd(new Date());
+}
+
+function ymdToLocalDate(ymd: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+function startOfWeekMonday(ref: Date): Date {
+  const d = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+  const day = d.getDay(); // 0 Sun … 6 Sat
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function endOfWeekSunday(ref: Date): Date {
+  const start = startOfWeekMonday(ref);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return end;
+}
+
+/** Cocokkan periode: deadline ATAU created_at dalam rentang (lebih relevan untuk dashboard). */
+function isWithinTimePeriod(
+  deadline: string,
+  period: TimePeriod,
+  createdAt?: string | null
+): boolean {
   const today = new Date();
-  const todayDate = getTodayDate();
-  const taskDate = getTaskDate(deadline);
-  
-  if (!taskDate) return false;
-  
-  const taskDateObj = new Date(taskDate);
-  
+  const todayYmd = getTodayDate();
+  const deadlineYmd = toLocalYmd(deadline);
+  const createdYmd = toLocalYmd(createdAt || "");
+
+  const dates = [deadlineYmd, createdYmd].filter(Boolean);
+  if (dates.length === 0) return false;
+
   switch (period) {
     case "today":
-      return taskDate === todayDate;
+      return dates.some((d) => d === todayYmd);
     case "week": {
-      // Get Monday of this week
-      const currentDay = today.getDay();
-      const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
-      const weekStart = new Date(today.setDate(diff));
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 6);
-      
-      // Compare dates
-      const start = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
-      const end = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate());
-      
-      return taskDateObj >= start && taskDateObj <= end;
+      const start = startOfWeekMonday(today);
+      const end = endOfWeekSunday(today);
+      return dates.some((ymd) => {
+        const d = ymdToLocalDate(ymd);
+        return d != null && d >= start && d <= end;
+      });
     }
     case "month": {
-      return taskDateObj.getFullYear() === today.getFullYear() && 
-             taskDateObj.getMonth() === today.getMonth();
+      const y = today.getFullYear();
+      const m = today.getMonth();
+      return dates.some((ymd) => {
+        const d = ymdToLocalDate(ymd);
+        return d != null && d.getFullYear() === y && d.getMonth() === m;
+      });
     }
     default:
       return false;
@@ -161,7 +183,6 @@ export default function DashboardPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showFilters, setShowFilters] = useState(false);
   const [activeTab, setActiveTab] = useState<"tasks" | "checklists">("tasks");
 
   // Filters
@@ -305,8 +326,8 @@ export default function DashboardPage() {
 
   const filteredTasks = manualTasks
     .filter((task) => {
-      // Apply time period filter
-      if (!isWithinTimePeriod(task.deadline, timePeriod)) return false;
+      // Apply time period filter (deadline ATAU created_at)
+      if (!isWithinTimePeriod(task.deadline, timePeriod, task.created_at)) return false;
       
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -329,8 +350,7 @@ export default function DashboardPage() {
 
   const filteredChecklists = checklistTasks
     .filter((checklist) => {
-      // Apply time period filter
-      if (!isWithinTimePeriod(checklist.deadline, timePeriod)) return false;
+      if (!isWithinTimePeriod(checklist.deadline, timePeriod, checklist.created_at)) return false;
       
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -345,11 +365,20 @@ export default function DashboardPage() {
       return true;
     })
     .sort((a, b) => {
-      // Sort by deadline: oldest to newest
       const deadlineA = new Date(a.deadline).getTime();
       const deadlineB = new Date(b.deadline).getTime();
       return deadlineA - deadlineB;
     });
+
+  // Ringkasan kartu = data yang sudah difilter periode (bukan semua tugas)
+  const periodManualTasks = manualTasks.filter((t) =>
+    isWithinTimePeriod(t.deadline, timePeriod, t.created_at)
+  );
+  const periodChecklistTasks = checklistTasks.filter((t) =>
+    isWithinTimePeriod(t.deadline, timePeriod, t.created_at)
+  );
+  const visibleSummary = calculateTaskSummary(periodManualTasks);
+  const visibleChecklistSummary = calculateChecklistSummary(periodChecklistTasks);
 
   // Pagination: calculate total pages and slice current page
   const totalPages = Math.ceil(filteredTasks.length / itemsPerPage);
@@ -378,12 +407,11 @@ export default function DashboardPage() {
 
   const handleStatusClick = (statusKey: string) => {
     const status = summaryKeyToStatus(statusKey);
-    // Toggle: klik status yang sama → reset; selain itu set filter + buka panel
+    // Toggle: klik status yang sama → reset; selain itu set filter
     if (selectedStatus === status) {
       setSelectedStatus("ALL");
     } else {
       setSelectedStatus(status);
-      setShowFilters(true);
       setCurrentPage(1);
     }
   };
@@ -504,18 +532,18 @@ export default function DashboardPage() {
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="tasks" className="flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
-              Tugas ({manualTasks.length})
+              Tugas ({filteredTasks.length})
             </TabsTrigger>
             <TabsTrigger value="checklists" className="flex items-center gap-2">
               <ListChecks className="w-4 h-4" />
-              Checklist ({checklists.length})
+              Checklist ({filteredChecklists.length})
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="tasks" className="space-y-4 mt-4">
-            {/* Task Summary Cards */}
+            {/* Task Summary Cards — ikut filter periode */}
             <DashboardSummaryCards 
-              summary={summary} 
+              summary={visibleSummary} 
               isLoading={showSkeleton}
               onStatusClick={handleStatusClick}
               activeStatus={selectedStatus}
@@ -533,15 +561,6 @@ export default function DashboardPage() {
                 />
               </div>
               <Button
-                variant={showFilters || hasActiveFilters ? "secondary" : "outline"}
-                size="icon"
-                onClick={() => setShowFilters(!showFilters)}
-                className="shrink-0"
-                title="Filter"
-              >
-                <Filter className="w-4 h-4" />
-              </Button>
-              <Button
                 variant="outline"
                 size="icon"
                 onClick={handleRefresh}
@@ -558,91 +577,89 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            {/* Chip filter aktif — selalu kelihatan & bisa diklik meski panel tertutup */}
-            {selectedStatus !== "ALL" && !showFilters && (
-              <div className="flex flex-wrap items-center gap-2">
-                <button
+            {/* Filter selalu terlihat & langsung mengubah daftar */}
+            <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+              <div className="flex gap-1 bg-card rounded p-1">
+                <Button
                   type="button"
-                  onClick={() => setShowFilters(true)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary"
+                  variant={timePeriod === "today" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => {
+                    setTimePeriod("today");
+                    setCurrentPage(1);
+                  }}
+                  className="text-xs"
                 >
-                  Status: {statusFilterLabel(selectedStatus)}
-                </button>
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-muted-foreground">
-                  <X className="w-3.5 h-3.5 mr-1" />
-                  Reset
+                  Hari Ini
+                </Button>
+                <Button
+                  type="button"
+                  variant={timePeriod === "week" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => {
+                    setTimePeriod("week");
+                    setCurrentPage(1);
+                  }}
+                  className="text-xs"
+                >
+                  Minggu Ini
+                </Button>
+                <Button
+                  type="button"
+                  variant={timePeriod === "month" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => {
+                    setTimePeriod("month");
+                    setCurrentPage(1);
+                  }}
+                  className="text-xs"
+                >
+                  Bulan Ini
                 </Button>
               </div>
-            )}
 
-            {/* Filter Panel — muncul otomatis saat kartu Open/Submitted diklik */}
-            {(showFilters || hasActiveFilters) && (
-              <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
-                {/* Time Period Selector */}
-                <div className="flex gap-1 bg-card rounded p-1">
-                  <Button
-                    variant={timePeriod === "today" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setTimePeriod("today")}
-                    className="text-xs"
-                  >
-                    Hari Ini
-                  </Button>
-                  <Button
-                    variant={timePeriod === "week" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setTimePeriod("week")}
-                    className="text-xs"
-                  >
-                    Minggu Ini
-                  </Button>
-                  <Button
-                    variant={timePeriod === "month" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setTimePeriod("month")}
-                    className="text-xs"
-                  >
-                    Bulan Ini
-                  </Button>
-                </div>
-                
-                <Select
-                  value={selectedOutlet}
-                  onValueChange={(v) => setSelectedOutlet(v as Outlet | "ALL")}
-                >
-                  <SelectTrigger className="w-[140px] bg-card">
-                    <SelectValue placeholder="Outlet" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Semua Outlet</SelectItem>
-                    {outlets.map((outlet) => (
-                      <SelectItem key={outlet} value={outlet}>{outlet}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Select
+                value={selectedOutlet}
+                onValueChange={(v) => {
+                  setSelectedOutlet(v as Outlet | "ALL");
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[140px] bg-card">
+                  <SelectValue placeholder="Outlet" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Semua Outlet</SelectItem>
+                  {outlets.map((outlet) => (
+                    <SelectItem key={outlet} value={outlet}>{outlet}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-                <Select
-                  value={selectedStatus}
-                  onValueChange={(v) => setSelectedStatus(v as TaskStatus | "ALL")}
-                >
-                  <SelectTrigger className="w-[160px] bg-card">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Select
+                value={selectedStatus}
+                onValueChange={(v) => {
+                  setSelectedStatus(v as TaskStatus | "ALL");
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[160px] bg-card">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
-                    <X className="w-4 h-4 mr-1" />
-                    Reset
-                  </Button>
-                )}
-              </div>
-            )}
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                  <X className="w-4 h-4 mr-1" />
+                  Reset
+                </Button>
+              )}
+            </div>
 
             {/* Task List */}
             <div className="space-y-3">
@@ -685,7 +702,7 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 <>
-                  <div className="space-y-3">
+                  <div className="space-y-3" key={`tasks-${timePeriod}-${selectedStatus}-${selectedOutlet}`}>
                     {paginatedTasks.map((task) => (
                       <TaskCard key={task.task_id} task={task} onDelete={handleDeleteTask} />
                     ))}
@@ -713,15 +730,13 @@ export default function DashboardPage() {
           </TabsContent>
 
           <TabsContent value="checklists" className="space-y-4 mt-4">
-            {/* Checklist Summary Cards */}
             <ChecklistSummaryCards 
-              summary={checklistSummary} 
+              summary={visibleChecklistSummary} 
               isLoading={showSkeleton}
               onStatusClick={handleStatusClick}
               activeStatus={selectedStatus}
             />
 
-            {/* Search and Filter Bar */}
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -733,100 +748,99 @@ export default function DashboardPage() {
                 />
               </div>
               <Button
-                variant={showFilters || hasActiveFilters ? "secondary" : "outline"}
+                variant="outline"
                 size="icon"
-                onClick={() => setShowFilters(!showFilters)}
+                onClick={handleRefresh}
+                disabled={isRefreshing || isLoading}
                 className="shrink-0"
-                title="Filter"
+                title="Refresh data"
               >
-                <Filter className="w-4 h-4" />
+                <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
               </Button>
             </div>
 
-            {selectedStatus !== "ALL" && !showFilters && (
-              <div className="flex flex-wrap items-center gap-2">
-                <button
+            <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
+              <div className="flex gap-1 bg-card rounded p-1">
+                <Button
                   type="button"
-                  onClick={() => setShowFilters(true)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary"
+                  variant={timePeriod === "today" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => {
+                    setTimePeriod("today");
+                    setCurrentPage(1);
+                  }}
+                  className="text-xs"
                 >
-                  Status: {statusFilterLabel(selectedStatus)}
-                </button>
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-muted-foreground">
-                  <X className="w-3.5 h-3.5 mr-1" />
-                  Reset
+                  Hari Ini
+                </Button>
+                <Button
+                  type="button"
+                  variant={timePeriod === "week" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => {
+                    setTimePeriod("week");
+                    setCurrentPage(1);
+                  }}
+                  className="text-xs"
+                >
+                  Minggu Ini
+                </Button>
+                <Button
+                  type="button"
+                  variant={timePeriod === "month" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => {
+                    setTimePeriod("month");
+                    setCurrentPage(1);
+                  }}
+                  className="text-xs"
+                >
+                  Bulan Ini
                 </Button>
               </div>
-            )}
 
-            {/* Filter Panel */}
-            {(showFilters || hasActiveFilters) && (
-              <div className="flex flex-wrap gap-2 p-3 bg-muted/50 rounded-lg">
-                {/* Time Period Selector */}
-                <div className="flex gap-1 bg-card rounded p-1">
-                  <Button
-                    variant={timePeriod === "today" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setTimePeriod("today")}
-                    className="text-xs"
-                  >
-                    Hari Ini
-                  </Button>
-                  <Button
-                    variant={timePeriod === "week" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setTimePeriod("week")}
-                    className="text-xs"
-                  >
-                    Minggu Ini
-                  </Button>
-                  <Button
-                    variant={timePeriod === "month" ? "default" : "ghost"}
-                    size="sm"
-                    onClick={() => setTimePeriod("month")}
-                    className="text-xs"
-                  >
-                    Bulan Ini
-                  </Button>
-                </div>
+              <Select
+                value={selectedOutlet}
+                onValueChange={(v) => {
+                  setSelectedOutlet(v as Outlet | "ALL");
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[140px] bg-card">
+                  <SelectValue placeholder="Outlet" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Semua Outlet</SelectItem>
+                  {outlets.map((outlet) => (
+                    <SelectItem key={outlet} value={outlet}>{outlet}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-                <Select
-                  value={selectedOutlet}
-                  onValueChange={(v) => setSelectedOutlet(v as Outlet | "ALL")}
-                >
-                  <SelectTrigger className="w-[140px] bg-card">
-                    <SelectValue placeholder="Outlet" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Semua Outlet</SelectItem>
-                    {outlets.map((outlet) => (
-                      <SelectItem key={outlet} value={outlet}>{outlet}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <Select
+                value={selectedStatus}
+                onValueChange={(v) => {
+                  setSelectedStatus(v as TaskStatus | "ALL");
+                  setCurrentPage(1);
+                }}
+              >
+                <SelectTrigger className="w-[160px] bg-card">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-                <Select
-                  value={selectedStatus}
-                  onValueChange={(v) => setSelectedStatus(v as TaskStatus | "ALL")}
-                >
-                  <SelectTrigger className="w-[160px] bg-card">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
-                    <X className="w-4 h-4 mr-1" />
-                    Reset
-                  </Button>
-                )}
-              </div>
-            )}
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-muted-foreground">
+                  <X className="w-4 h-4 mr-1" />
+                  Reset
+                </Button>
+              )}
+            </div>
 
             {/* Checklist List */}
             <div className="space-y-3">
