@@ -46,7 +46,7 @@ import {
   areas as mockAreas,
   categories as mockCategories,
 } from "./mock-data";
-import { allowGasMockFallback, gasUnavailable, GAS_UNAVAILABLE_MSG } from "./gas-mock";
+import { allowGasMockFallback, gasUnavailable } from "./gas-mock";
 
 // Internal API endpoint - no longer expose GAS URL directly
 const API_BASE = "/api/gas";
