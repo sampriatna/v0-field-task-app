@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
+import { AuthGate } from '@/components/auth-gate'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -38,7 +39,7 @@ export default function RootLayout({
   return (
     <html lang="id" className="bg-background">
       <body className="font-sans antialiased min-h-screen">
-        {children}
+        <AuthGate>{children}</AuthGate>
         <Toaster />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
