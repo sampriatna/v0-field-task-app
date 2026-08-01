@@ -69,6 +69,7 @@ export interface Task {
   duration_minutes?: number;
   last_updated: string;
   checklist_mode?: string; // "YES" for checklist tasks, undefined/empty for manual tasks
+  checklist_title?: string; // GAS may return a separate title for checklist tasks
 }
 
 export interface CreateTaskPayload {

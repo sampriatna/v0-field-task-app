@@ -32,7 +32,7 @@ export async function createSession(extra?: Partial<SessionPayload>): Promise<st
     ...extra,
   };
 
-  const token = await new SignJWT(payload as Parameters<SignJWT["sign"]>[0])
+  const token = await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(expiresAt / 1000)

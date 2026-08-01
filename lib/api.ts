@@ -9,6 +9,7 @@ import type {
   CreateRecurringTemplatePayload,
   UpdateRecurringTemplatePayload,
   ChecklistReport,
+  ChecklistReportItem,
   SubmitChecklistPayload,
   ChecklistSummary,
   ChecklistItem,
@@ -845,7 +846,7 @@ export async function getChecklistByToken(
 
     // Pre-process: merge task fields into root so normalizer finds deadline/outlet/items
     if (result.data && typeof result.data === 'object') {
-      const d = result.data as Record<string, unknown>;
+      const d = result.data as unknown as Record<string, unknown>;
       if (d.task && typeof d.task === 'object') {
         Object.assign(d, d.task as Record<string, unknown>);
       }
@@ -1308,7 +1309,7 @@ export async function getAreas(): Promise<ApiResponse<string[]>> {
   try {
     const result = await callApi<unknown>("getAreas", {});
 
-    if (result.error === "GAS_NOT_CONFIGURED") return allowGasMockFallback() ? { success: true, data: mockAreas } : gasUnavailable();
+    if (result.error === "GAS_NOT_CONFIGURED") return allowGasMockFallback() ? { success: true, data: [...mockAreas] } : gasUnavailable();
     if (!result.success && result.error) return { success: false, error: result.error };
 
     if (result.success && result.data) {
@@ -1328,9 +1329,9 @@ export async function getAreas(): Promise<ApiResponse<string[]>> {
       }
     }
 
-    return { success: true, data: mockAreas };
+    return { success: true, data: [...mockAreas] };
   } catch {
-    return allowGasMockFallback() ? { success: true, data: mockAreas } : gasUnavailable();
+    return allowGasMockFallback() ? { success: true, data: [...mockAreas] } : gasUnavailable();
   }
 }
 
@@ -1371,7 +1372,7 @@ export async function getCategories(): Promise<ApiResponse<string[]>> {
   try {
     const result = await callApi<unknown>("getCategories", {});
 
-    if (result.error === "GAS_NOT_CONFIGURED") return allowGasMockFallback() ? { success: true, data: mockCategories } : gasUnavailable();
+    if (result.error === "GAS_NOT_CONFIGURED") return allowGasMockFallback() ? { success: true, data: [...mockCategories] } : gasUnavailable();
     if (!result.success && result.error) return { success: false, error: result.error };
 
     if (result.success && result.data) {
@@ -1391,9 +1392,9 @@ export async function getCategories(): Promise<ApiResponse<string[]>> {
       }
     }
 
-    return { success: true, data: mockCategories };
+    return { success: true, data: [...mockCategories] };
   } catch {
-    return allowGasMockFallback() ? { success: true, data: mockCategories } : gasUnavailable();
+    return allowGasMockFallback() ? { success: true, data: [...mockCategories] } : gasUnavailable();
   }
 }
 
