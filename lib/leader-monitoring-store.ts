@@ -22,6 +22,7 @@ import {
   getStaffCache,
   applyLeaderValidation,
   listSubmissionsNeedingFix,
+  getSubmissionById,
 } from "@/lib/staff-report-store";
 
 function nowISO() {
@@ -239,9 +240,9 @@ function computeStatusFromScores(
   return "aman";
 }
 
-export function submitLeaderMonitor(
+export async function submitLeaderMonitor(
   payload: SubmitLeaderMonitorPayload
-): { success: true; data: LeaderMonitorSubmission } | { success: false; error: string } {
+): Promise<{ success: true; data: LeaderMonitorSubmission } | { success: false; error: string }> {
   const template = getState().templates.find((t) => t.id === payload.template_id);
   if (!template || !template.active) {
     return { success: false, error: "Template monitoring tidak ditemukan." };
@@ -338,7 +339,7 @@ export function submitLeaderMonitor(
     payload.staff_validation &&
     ["revisi", "tidak_valid", "manipulasi", "valid"].includes(payload.staff_validation)
   ) {
-    applyLeaderValidation({
+    await applyLeaderValidation({
       submission_id: payload.staff_submission_id,
       validation: payload.staff_validation,
       note: problem_note || fix_instruction,
@@ -382,15 +383,15 @@ export function listLeaderMonitorSubmissions(
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
-export function buildLeaderMonitorDashboard(
+export async function buildLeaderMonitorDashboard(
   filters: LeaderMonitorFilters = {}
-): LeaderMonitorDashboardData {
+): Promise<LeaderMonitorDashboardData> {
   const date = filters.date || todayISO();
   const outlet = filters.outlet;
   const submissions = listLeaderMonitorSubmissions({ ...filters, date });
   const templates = listLeaderMonitorTemplates(outlet);
 
-  const staff_need_fix = listSubmissionsNeedingFix(date).filter(
+  const staff_need_fix = (await listSubmissionsNeedingFix(date)).filter(
     (s) => !outlet || outlet === "ALL" || s.outlet_id === outlet
   );
 
@@ -411,14 +412,17 @@ export function buildLeaderMonitorDashboard(
   return { summary, templates, submissions, staff_need_fix };
 }
 
-export function validateStaffReportFromLeader(
+export async function validateStaffReportFromLeader(
   payload: ValidateStaffReportPayload
-): { success: true; data: DailyReportSubmission } | { success: false; error: string } {
+): Promise<
+  { success: true; data: DailyReportSubmission } | { success: false; error: string }
+> {
   return applyLeaderValidation(payload);
 }
 
-export function getLeaderStaffOptions(outlet?: string) {
-  return getStaffCache()
+export async function getLeaderStaffOptions(outlet?: string) {
+  const staff = await getStaffCache();
+  return staff
     .filter((s) => s.status === "ACTIVE")
     .filter((s) => !outlet || outlet === "ALL" || s.outlet === outlet)
     .map((s) => ({
@@ -429,7 +433,7 @@ export function getLeaderStaffOptions(outlet?: string) {
     }));
 }
 
-export function getStaffSubmissionForValidate(id: string) {
+export async function getStaffSubmissionForValidate(id: string) {
   return getSubmissionById(id);
 }
 

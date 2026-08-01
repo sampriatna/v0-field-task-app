@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
-import { getSession, isAuthenticated } from "@/lib/auth";
 import { updateReportTemplate } from "@/lib/staff-report-store";
+import {
+  requireDailyActivityAdmin,
+  isSessionPayload,
+} from "@/lib/staff-report-api-auth";
+import { dailyActivityStorageErrorResponse } from "@/lib/staff-report-api-utils";
 import type { ReportTemplateCategory, ReportTemplateKind } from "@/lib/types";
 
 export async function PUT(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const session = await getSession();
-  if (!isAuthenticated(session)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await requireDailyActivityAdmin();
+  if (!isSessionPayload(session)) return session;
 
   const { id } = await context.params;
 
@@ -32,7 +34,7 @@ export async function PUT(
           .filter((i: { item_text: string }) => i.item_text)
       : undefined;
 
-    const result = updateReportTemplate({
+    const result = await updateReportTemplate({
       id,
       title: body.title,
       category: body.category as ReportTemplateCategory | undefined,
@@ -51,6 +53,7 @@ export async function PUT(
             ? null
             : String(body.position_group),
       requires_photo: body.requires_photo,
+      requires_note: body.requires_note,
       is_required_daily: body.is_required_daily,
       kind: body.kind as ReportTemplateKind | undefined,
       target_time_start:
@@ -74,10 +77,13 @@ export async function PUT(
       return NextResponse.json(result, { status: 404 });
     }
     return NextResponse.json(result);
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid request body" },
-      { status: 400 }
-    );
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
+    return dailyActivityStorageErrorResponse(error);
   }
 }
