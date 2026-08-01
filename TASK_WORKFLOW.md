@@ -353,12 +353,12 @@ POST /api/gas
 
 ## Environment Setup
 
-Required environment variables (in `.env.development.local`):
+Required environment variables (in `.env.development.local` — **jangan commit nilai asli ke git**):
 
 ```bash
 GAS_WEB_APP_URL='https://script.google.com/macros/s/...'
-ADMIN_PASSWORD='@Tukgumer123'
-SESSION_SECRET='nusafood_session_secret_2026_Kp9xL2mQ8zR7vT4bN6cY3wE5'
+ADMIN_PASSWORD='[set-in-vercel-env-only]'
+SESSION_SECRET='[generate-random-64-char-string]'
 ```
 
 ---

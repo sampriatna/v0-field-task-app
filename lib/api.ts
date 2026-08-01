@@ -46,6 +46,7 @@ import {
   areas as mockAreas,
   categories as mockCategories,
 } from "./mock-data";
+import { allowGasMockFallback, gasUnavailable, GAS_UNAVAILABLE_MSG } from "./gas-mock";
 
 // Internal API endpoint - no longer expose GAS URL directly
 const API_BASE = "/api/gas";
@@ -369,6 +370,10 @@ export async function createTask(payload: CreateTaskPayload): Promise<ApiRespons
     const result = await callApi<Task>("createTask", payload as unknown as Record<string, unknown>);
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       // Mock response
       await delay(1000);
       const newTask: Task = {
@@ -409,6 +414,10 @@ export async function getTaskByToken(
     );
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(500);
       const task = mockTasks.find((t) => t.task_id === taskId && t.token === token);
       if (task) {
@@ -439,8 +448,7 @@ export async function markOpened(taskId: string, token: string): Promise<ApiResp
     const result = await callApi<void>("markOpened", { task_id: taskId, token });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(200);
-      return { success: true };
+      return gasUnavailable();
     }
 
     return result;
@@ -462,8 +470,7 @@ export async function submitTaskReport(
     );
 
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(1500);
-      return { success: true };
+      return gasUnavailable();
     }
 
     return result;
@@ -485,6 +492,10 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
 
     // GAS not configured → show mock data so app still works without GAS
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(300);
       let tasks = [...mockTasks];
       if (filters?.outlet) tasks = tasks.filter((t) => t.outlet === filters.outlet);
@@ -507,7 +518,10 @@ export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[
 
     return { success: true, data: [] };
   } catch {
-    // Network failure — fallback to mock
+    if (!allowGasMockFallback()) {
+      return gasUnavailable();
+    }
+    // Network failure — dev mock only
     await delay(300);
     let tasks = [...mockTasks];
     if (filters?.outlet) tasks = tasks.filter((t) => t.outlet === filters.outlet);
@@ -548,6 +562,10 @@ export async function getDashboardSummary(): Promise<ApiResponse<DashboardSummar
     const result = await callApi<DashboardSummary>("getDashboardSummary", undefined, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(300);
       return { success: true, data: mockDashboardSummary };
     }
@@ -574,8 +592,7 @@ export async function verifyTask(
     });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(800);
-      return { success: true };
+      return gasUnavailable();
     }
 
     return result;
@@ -592,8 +609,7 @@ export async function resendWhatsApp(taskId: string): Promise<ApiResponse<void>>
     const result = await callApi<void>("resendWhatsApp", { task_id: taskId });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(1000);
-      return { success: true };
+      return gasUnavailable();
     }
 
     return result;
@@ -613,11 +629,11 @@ export async function getRecurringTemplates(): Promise<ApiResponse<RecurringTemp
   try {
     const result = await callApi<RecurringTemplate[]>("getRecurringTemplates", undefined, "GET");
     // Only fall back to mock when GAS is not configured at all
-    if (result.error === "GAS_NOT_CONFIGURED") return { success: true, data: mockRecurringTemplates };
+    if (result.error === "GAS_NOT_CONFIGURED") return allowGasMockFallback() ? { success: true, data: mockRecurringTemplates } : gasUnavailable();
     if (!result.success) return { success: false, error: result.error || "Gagal mengambil template" };
     return { success: true, data: result.data ?? [] };
   } catch {
-    return { success: true, data: mockRecurringTemplates };
+    return allowGasMockFallback() ? { success: true, data: mockRecurringTemplates } : gasUnavailable();
   }
 }
 
@@ -625,6 +641,10 @@ export async function getRecurringTemplate(templateId: string): Promise<ApiRespo
   try {
     const result = await callApi<RecurringTemplate>("getRecurringTemplate", { template_id: templateId }, "GET");
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       const template = mockRecurringTemplates.find(t => t.template_id === templateId);
       return template ? { success: true, data: template } : { success: false, error: "Template tidak ditemukan" };
     }
@@ -648,6 +668,10 @@ export async function createRecurringTemplate(
     );
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(1000);
       const newTemplate: RecurringTemplate = {
         template_id: `REC-${String(Date.now()).slice(-6)}`,
@@ -679,6 +703,10 @@ export async function updateRecurringTemplate(
     );
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(1000);
       const existingTemplate = mockRecurringTemplates.find(t => t.template_id === payload.template_id);
       const updatedTemplate: RecurringTemplate = {
@@ -711,8 +739,7 @@ export async function toggleRecurringTemplateStatus(
     });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(500);
-      return { success: true };
+      return gasUnavailable();
     }
 
     return result;
@@ -732,12 +759,16 @@ export async function getChecklistItems(templateId: string): Promise<ApiResponse
   try {
     const result = await callApi<ChecklistItem[]>("getChecklistItems", { template_id: templateId }, "GET");
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       return { success: true, data: mockChecklistItems.filter(i => i.template_id === templateId) };
     }
     if (!result.success) return { success: false, error: result.error || "Gagal mengambil checklist items" };
     return { success: true, data: result.data ?? [] };
   } catch {
-    return { success: true, data: mockChecklistItems.filter(i => i.template_id === templateId) };
+    return allowGasMockFallback() ? { success: true, data: mockChecklistItems.filter(i => i.template_id === templateId) } : gasUnavailable();
   }
 }
 
@@ -752,6 +783,10 @@ export async function saveChecklistItems(
     });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(800);
       const savedItems: ChecklistItem[] = items.map((item, index) => ({
         ...item,
@@ -786,6 +821,10 @@ export async function getChecklistByToken(
     );
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(500);
       const report = mockChecklistReports.find(
         (r) => r.task_id === taskId && r.token === token
@@ -840,8 +879,7 @@ export async function submitChecklistReport(
     );
 
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(1500);
-      return { success: true };
+      return gasUnavailable();
     }
 
     return result;
@@ -860,6 +898,10 @@ export async function generateChecklistReport(templateId: string): Promise<ApiRe
     });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(1000);
       return {
         success: true,
@@ -887,6 +929,10 @@ export async function getChecklistReports(
     );
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       let reports = [...mockChecklistReports];
       if (filters?.outlet) reports = reports.filter((r) => r.outlet === filters.outlet);
       if (filters?.status) reports = reports.filter((r) => r.status === filters.status);
@@ -896,7 +942,7 @@ export async function getChecklistReports(
     if (!result.success) return { success: false, error: result.error || "Gagal mengambil checklist reports" };
     return { success: true, data: result.data ?? [] };
   } catch {
-    return { success: true, data: mockChecklistReports };
+    return allowGasMockFallback() ? { success: true, data: mockChecklistReports } : gasUnavailable();
   }
 }
 
@@ -904,6 +950,10 @@ export async function getChecklistDetail(taskId: string): Promise<ApiResponse<Ch
   try {
     const result = await callApi<ChecklistReport>("getChecklistDetail", { task_id: taskId }, "GET");
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       const report = mockChecklistReports.find((r) => r.task_id === taskId);
       return report ? { success: true, data: report } : { success: false, error: "Checklist tidak ditemukan" };
     }
@@ -927,6 +977,10 @@ export async function getChecklistSummary(): Promise<ApiResponse<ChecklistSummar
     const result = await callApi<ChecklistSummary>("getChecklistSummary", undefined, "GET");
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(300);
       return { success: true, data: mockChecklistSummary };
     }
@@ -953,8 +1007,7 @@ export async function verifyChecklist(
     });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(800);
-      return { success: true };
+      return gasUnavailable();
     }
 
     return result;
@@ -971,8 +1024,7 @@ export async function resendChecklistWhatsApp(taskId: string): Promise<ApiRespon
     const result = await callApi<void>("resendChecklistWhatsApp", { task_id: taskId });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(1000);
-      return { success: true };
+      return gasUnavailable();
     }
 
     return result;
@@ -1022,6 +1074,10 @@ export async function getStaff(filters?: { outlet?: string; status?: string }): 
 
     // GAS not configured → silent fallback to mock
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       let staff = [...mockStaff];
       if (filters?.outlet) staff = staff.filter(s => s.outlet === filters.outlet);
       if (filters?.status) staff = staff.filter(s => s.status === filters.status);
@@ -1043,7 +1099,7 @@ export async function getStaff(filters?: { outlet?: string; status?: string }): 
 
     return { success: true, data: [] };
   } catch {
-    return { success: true, data: mockStaff };
+    return allowGasMockFallback() ? { success: true, data: mockStaff } : gasUnavailable();
   }
 }
 
@@ -1054,6 +1110,10 @@ export async function createStaff(payload: CreateStaffPayload): Promise<ApiRespo
     const result = await callApi<Record<string, unknown>>("createStaff", gasPayload);
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(1000);
       const newStaff: Staff = {
         staff_id: `STF-${String(Date.now()).slice(-6)}`,
@@ -1086,6 +1146,10 @@ export async function updateStaff(payload: UpdateStaffPayload): Promise<ApiRespo
     const result = await callApi<Record<string, unknown>>("updateStaff", gasPayload);
 
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(1000);
       const updatedStaff: Staff = {
         ...payload,
@@ -1115,8 +1179,7 @@ export async function deactivateStaff(staffId: string): Promise<ApiResponse<void
     const result = await callApi<void>("deactivateStaff", { staff_id: staffId });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(500);
-      return { success: true };
+      return gasUnavailable();
     }
 
     return result;
@@ -1133,8 +1196,7 @@ export async function activateStaff(staffId: string): Promise<ApiResponse<void>>
     const result = await callApi<void>("activateStaff", { staff_id: staffId });
 
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(500);
-      return { success: true };
+      return gasUnavailable();
     }
 
     return result;
@@ -1154,6 +1216,10 @@ export async function getUsers(): Promise<ApiResponse<UserLogin[]>> {
   try {
     const result = await callApi<unknown>("getUsers", {});
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       return { success: true, data: [] };
     }
     if (result.success && result.data) {
@@ -1242,7 +1308,7 @@ export async function getAreas(): Promise<ApiResponse<string[]>> {
   try {
     const result = await callApi<unknown>("getAreas", {});
 
-    if (result.error === "GAS_NOT_CONFIGURED") return { success: true, data: mockAreas };
+    if (result.error === "GAS_NOT_CONFIGURED") return allowGasMockFallback() ? { success: true, data: mockAreas } : gasUnavailable();
     if (!result.success && result.error) return { success: false, error: result.error };
 
     if (result.success && result.data) {
@@ -1264,7 +1330,7 @@ export async function getAreas(): Promise<ApiResponse<string[]>> {
 
     return { success: true, data: mockAreas };
   } catch {
-    return { success: true, data: mockAreas };
+    return allowGasMockFallback() ? { success: true, data: mockAreas } : gasUnavailable();
   }
 }
 
@@ -1272,6 +1338,10 @@ export async function createArea(name: string): Promise<ApiResponse<string>> {
   try {
     const result = await callApi<Record<string, unknown>>("createArea", { name });
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(500);
       return { success: true, data: name };
     }
@@ -1288,8 +1358,7 @@ export async function deleteArea(name: string): Promise<ApiResponse<void>> {
   try {
     const result = await callApi<void>("deleteArea", { name });
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(300);
-      return { success: true };
+      return gasUnavailable();
     }
     if (result.success) return { success: true };
     return { success: false, error: result.error || "Gagal menghapus area" };
@@ -1302,7 +1371,7 @@ export async function getCategories(): Promise<ApiResponse<string[]>> {
   try {
     const result = await callApi<unknown>("getCategories", {});
 
-    if (result.error === "GAS_NOT_CONFIGURED") return { success: true, data: mockCategories };
+    if (result.error === "GAS_NOT_CONFIGURED") return allowGasMockFallback() ? { success: true, data: mockCategories } : gasUnavailable();
     if (!result.success && result.error) return { success: false, error: result.error };
 
     if (result.success && result.data) {
@@ -1324,7 +1393,7 @@ export async function getCategories(): Promise<ApiResponse<string[]>> {
 
     return { success: true, data: mockCategories };
   } catch {
-    return { success: true, data: mockCategories };
+    return allowGasMockFallback() ? { success: true, data: mockCategories } : gasUnavailable();
   }
 }
 
@@ -1332,6 +1401,10 @@ export async function createCategory(name: string): Promise<ApiResponse<string>>
   try {
     const result = await callApi<Record<string, unknown>>("createCategory", { name });
     if (result.error === "GAS_NOT_CONFIGURED") {
+      if (!allowGasMockFallback()) {
+        return gasUnavailable();
+      }
+
       await delay(500);
       return { success: true, data: name };
     }
@@ -1348,8 +1421,7 @@ export async function deleteCategory(name: string): Promise<ApiResponse<void>> {
   try {
     const result = await callApi<void>("deleteCategory", { name });
     if (result.error === "GAS_NOT_CONFIGURED") {
-      await delay(300);
-      return { success: true };
+      return gasUnavailable();
     }
     if (result.success) return { success: true };
     return { success: false, error: result.error || "Gagal menghapus kategori" };
