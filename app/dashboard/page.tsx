@@ -189,7 +189,7 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOutlet, setSelectedOutlet] = useState<Outlet | "ALL">("ALL");
   const [selectedStatus, setSelectedStatus] = useState<TaskStatus | "ALL">("ALL");
-  const [timePeriod, setTimePeriod] = useState<TimePeriod>("today");
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>("week");
   const [currentPage, setCurrentPage] = useState(1); // Pagination: 1-indexed
   const itemsPerPage = 10;
 
@@ -261,8 +261,8 @@ export default function DashboardPage() {
     try {
       // Parallel — jangan tunggu getTasks selesai baru checklist
       const [tasksResult, checklistsResult] = await Promise.all([
-        getTasks(),
-        getChecklistReports(),
+        getTasks(undefined, { timeoutMs: 12_000 }),
+        getChecklistReports(undefined, { timeoutMs: 12_000 }),
       ]);
 
       let nextTasks: Task[] = [];
@@ -392,7 +392,14 @@ export default function DashboardPage() {
     setCurrentPage(1);
   }, [selectedOutlet, selectedStatus, searchQuery, timePeriod]);
 
-  const hasActiveFilters = selectedOutlet !== "ALL" || selectedStatus !== "ALL" || searchQuery !== "" || timePeriod !== "today";
+  const hasActiveFilters =
+    selectedOutlet !== "ALL" ||
+    selectedStatus !== "ALL" ||
+    searchQuery !== "" ||
+    timePeriod !== "week";
+
+  const timePeriodLabel =
+    timePeriod === "today" ? "hari ini" : timePeriod === "week" ? "minggu ini" : "bulan ini";
 
   const handleRefresh = async () => {
     await loadData({ soft: true });
@@ -445,7 +452,7 @@ export default function DashboardPage() {
         )}
 
         {/* Error Alert */}
-        {loadError && tasks.length > 0 && (
+        {loadError && (
           <Card className="bg-red-50 border-red-200">
             <CardContent className="p-4 flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
@@ -687,9 +694,25 @@ export default function DashboardPage() {
                   </div>
                   <h3 className="font-medium text-foreground mb-1">Tidak ada tugas ditemukan</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {hasActiveFilters ? "Coba ubah filter pencarian Anda" : "Belum ada tugas yang dibuat"}
+                    {tasks.length === 0
+                      ? loadError
+                        ? "Gagal memuat dari Google Sheets. Cek GAS_WEB_APP_URL di Vercel."
+                        : "Belum ada tugas di Google Sheets, atau GAS masih memuat."
+                      : hasActiveFilters
+                        ? "Coba ubah filter pencarian Anda"
+                        : `Tidak ada tugas untuk ${timePeriodLabel}. Ada ${tasks.length} tugas total — coba periode lain.`}
                   </p>
-                  {hasActiveFilters ? (
+                  {tasks.length > 0 && timePeriod !== "month" ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setTimePeriod(timePeriod === "today" ? "week" : "month");
+                        setCurrentPage(1);
+                      }}
+                    >
+                      Lihat {timePeriod === "today" ? "Minggu Ini" : "Bulan Ini"}
+                    </Button>
+                  ) : hasActiveFilters ? (
                     <Button variant="outline" onClick={clearFilters}>Reset Filter</Button>
                   ) : (
                     <Link href="/tasks/new">
@@ -868,9 +891,23 @@ export default function DashboardPage() {
                   </div>
                   <h3 className="font-medium text-foreground mb-1">Tidak ada checklist ditemukan</h3>
                   <p className="text-sm text-muted-foreground mb-4">
-                    {hasActiveFilters ? "Coba ubah filter pencarian Anda" : "Belum ada checklist"}
+                    {checklistTasks.length === 0
+                      ? "Belum ada checklist dari Google Sheets."
+                      : hasActiveFilters
+                        ? "Coba ubah filter pencarian Anda"
+                        : `Tidak ada checklist untuk ${timePeriodLabel}. Ada ${checklistTasks.length} checklist total.`}
                   </p>
-                  {hasActiveFilters ? (
+                  {checklistTasks.length > 0 && timePeriod !== "month" ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setTimePeriod(timePeriod === "today" ? "week" : "month");
+                        setCurrentPage(1);
+                      }}
+                    >
+                      Lihat {timePeriod === "today" ? "Minggu Ini" : "Bulan Ini"}
+                    </Button>
+                  ) : hasActiveFilters ? (
                     <Button variant="outline" onClick={clearFilters}>Reset Filter</Button>
                   ) : (
                     <Link href="/recurring">

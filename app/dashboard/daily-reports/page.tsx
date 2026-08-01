@@ -110,14 +110,8 @@ export default function DailyReportsDashboardPage() {
       if (refresh) setIsRefreshing(true);
       else setIsLoading(true);
       try {
-        // Sync staff dulu (data client) — dashboard tidak nunggu GAS
-        const staffRes = await getStaff({ status: "ACTIVE" });
-        if (staffRes.success && staffRes.data) {
-          setStaffList(staffRes.data);
-          await syncDailyReportStaff(staffRes.data);
-        }
-
-        const [dash, tplRes] = await Promise.all([
+        const [staffRes, dash, tplRes] = await Promise.all([
+          getStaff({ status: "ACTIVE" }),
           getDailyReportDashboard({
             date,
             outlet: outlet === "ALL" ? undefined : outlet,
@@ -127,6 +121,11 @@ export default function DailyReportsDashboardPage() {
           }),
           getReportTemplates(),
         ]);
+
+        if (staffRes.success && staffRes.data) {
+          setStaffList(staffRes.data);
+          void syncDailyReportStaff(staffRes.data);
+        }
 
         if (dash.success && dash.data) setData(dash.data);
         else {
@@ -420,8 +419,36 @@ export default function DailyReportsDashboardPage() {
             </div>
           ) : rows.length === 0 ? (
             <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                Tidak ada data untuk filter ini
+              <CardContent className="p-8 text-center space-y-3">
+                {staffList.length === 0 ? (
+                  <>
+                    <p className="text-muted-foreground">
+                      Belum ada staff di database Daily Activity. Sync dari master staff dulu.
+                    </p>
+                    <Link href="/settings/staff">
+                      <Button size="sm">Buka Pengaturan Staff</Button>
+                    </Link>
+                  </>
+                ) : templates.length === 0 ? (
+                  <>
+                    <p className="text-muted-foreground">
+                      Belum ada template kegiatan harian. Seed template dulu.
+                    </p>
+                    <Link href="/settings/report-templates">
+                      <Button size="sm">Seed Template</Button>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-muted-foreground">
+                      Tidak ada baris untuk tanggal {date}. Staff aktif: {staffList.length}, template:{" "}
+                      {templates.length}.
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Baris muncul per kombinasi staff × template yang cocok jabatan/outlet.
+                    </p>
+                  </>
+                )}
               </CardContent>
             </Card>
           ) : (
