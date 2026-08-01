@@ -150,7 +150,7 @@ export default function RecurringTasksSettingsPage() {
         pic_wa: template.pic_wa,
         task_title: template.task_title,
         task_description: template.task_description,
-        repeat_type: template.repeat_type.toLowerCase(),
+        repeat_type: template.repeat_type.toLowerCase() as RepeatType,
         repeat_days: template.repeat_days,
         repeat_time: template.repeat_time,
         deadline_time: template.deadline_time,
@@ -171,14 +171,9 @@ export default function RecurringTasksSettingsPage() {
     }
     setIsSubmitting(true);
     try {
-      const payload = {
-        ...formData,
-        repeat_type: formData.repeat_type.toUpperCase(),
-      };
-
       const result = editingTemplate
-        ? await updateRecurringTemplate({ ...payload, template_id: editingTemplate.template_id })
-        : await createRecurringTemplate(payload);
+        ? await updateRecurringTemplate({ ...formData, template_id: editingTemplate.template_id })
+        : await createRecurringTemplate(formData);
 
       if (result.success) {
         toast({ title: editingTemplate ? "Template Diperbarui" : "Template Dibuat" });

@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server";
-import { getSession, isAuthenticated } from "@/lib/auth";
 import { updateLeaderMonitorFollowUp } from "@/lib/leader-monitoring-store";
+import {
+  requireDailyActivityAdmin,
+  isSessionPayload,
+} from "@/lib/staff-report-api-auth";
+import { dailyActivityStorageErrorResponse } from "@/lib/staff-report-api-utils";
 import type { LeaderFollowUpStatus } from "@/lib/types";
 
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!isAuthenticated(session)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await requireDailyActivityAdmin();
+  if (!isSessionPayload(session)) return session;
 
   try {
     const body = (await request.json()) as {
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const result = updateLeaderMonitorFollowUp(body.id, body.follow_up_status, {
+    const result = await updateLeaderMonitorFollowUp(body.id, body.follow_up_status, {
       problem_note: body.problem_note,
       fix_instruction: body.fix_instruction,
     });
@@ -30,7 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 });
     }
     return NextResponse.json({ success: true, data: result.data });
-  } catch {
-    return NextResponse.json({ success: false, error: "Gagal update follow up." }, { status: 500 });
+  } catch (error) {
+    return dailyActivityStorageErrorResponse(error);
   }
 }

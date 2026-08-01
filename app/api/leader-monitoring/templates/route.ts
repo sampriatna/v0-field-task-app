@@ -1,18 +1,24 @@
 import { NextResponse } from "next/server";
-import { getSession, isAuthenticated } from "@/lib/auth";
 import { listLeaderMonitorTemplates } from "@/lib/leader-monitoring-store";
+import {
+  requireDailyActivityAdmin,
+  isSessionPayload,
+} from "@/lib/staff-report-api-auth";
+import { dailyActivityStorageErrorResponse } from "@/lib/staff-report-api-utils";
 
 export async function GET(request: Request) {
-  const session = await getSession();
-  if (!isAuthenticated(session)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+  const session = await requireDailyActivityAdmin();
+  if (!isSessionPayload(session)) return session;
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const outlet = searchParams.get("outlet") || undefined;
+
+    return NextResponse.json({
+      success: true,
+      data: await listLeaderMonitorTemplates(outlet),
+    });
+  } catch (error) {
+    return dailyActivityStorageErrorResponse(error);
   }
-
-  const { searchParams } = new URL(request.url);
-  const outlet = searchParams.get("outlet") || undefined;
-
-  return NextResponse.json({
-    success: true,
-    data: listLeaderMonitorTemplates(outlet),
-  });
 }

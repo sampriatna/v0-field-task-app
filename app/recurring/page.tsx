@@ -135,7 +135,7 @@ export default function RecurringPage() {
         pic_wa: template.pic_wa,
         task_title: template.task_title,
         task_description: template.task_description,
-        repeat_type: (template.repeat_type || "daily").toLowerCase(),
+        repeat_type: (template.repeat_type || "daily").toLowerCase() as RepeatType,
         repeat_days: template.repeat_days,
         repeat_time: template.repeat_time,
         deadline_time: template.deadline_time,
@@ -153,19 +153,14 @@ export default function RecurringPage() {
     setIsSubmitting(true);
 
     try {
-      const payload = {
-        ...formData,
-        repeat_type: formData.repeat_type.toUpperCase(),
-      };
-
       let result;
       if (editingTemplate) {
         result = await updateRecurringTemplate({
-          ...payload,
+          ...formData,
           template_id: editingTemplate.template_id,
         });
       } else {
-        result = await createRecurringTemplate(payload);
+        result = await createRecurringTemplate(formData);
       }
 
       if (result.success) {
@@ -249,7 +244,7 @@ export default function RecurringPage() {
     if (rt === "weekdays") return "Senin - Jumat (5 hari/minggu)";
     if (rt === "weekends") return "Sabtu & Minggu";
     if (rt === "monthly") {
-      const days = Array.isArray(template.repeat_days) ? template.repeat_days : (template.repeat_days || "").split(",").map((d: string) => d.trim()).filter(Boolean);
+      const days = template.repeat_days;
       return days.length > 0 ? "Tgl " + days.join(", ") + " setiap bulan" : "Bulanan";
     }
     if (rt === "weekly" || rt === "custom") {
@@ -259,7 +254,7 @@ export default function RecurringPage() {
         { value: "jumat", label: "Jumat" }, { value: "sabtu", label: "Sabtu" },
         { value: "minggu", label: "Minggu" },
       ];
-      const dayList = Array.isArray(template.repeat_days) ? template.repeat_days : (template.repeat_days || "").split(",").map((d: string) => d.trim()).filter(Boolean);
+      const dayList = template.repeat_days;
       if (dayList.length === 1) {
         const day = daysOfWeek.find(d => d.value === dayList[0]);
         return "Setiap " + (day ? day.label : dayList[0]);

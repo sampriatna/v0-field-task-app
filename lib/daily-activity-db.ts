@@ -46,9 +46,13 @@ function requireClient(): SupabaseClient {
 
 let client: SupabaseClient | null = null;
 
-function getClient(): SupabaseClient {
+export function getSupabaseClient(): SupabaseClient {
   if (!client) client = requireClient();
   return client;
+}
+
+function getClient(): SupabaseClient {
+  return getSupabaseClient();
 }
 
 function mapStaff(row: Record<string, unknown>): Staff {

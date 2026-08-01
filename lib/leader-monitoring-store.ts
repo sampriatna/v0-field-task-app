@@ -1,12 +1,11 @@
 /**
  * Leader Monitoring — kontrol lapangan di atas Daily Report staff.
- * Tidak mengganti submit staff; hanya validasi & checklist keliling leader.
+ * Persisted to Supabase PostgreSQL (lm_* tables).
  */
 
 import type {
   LeaderMonitorTemplate,
   LeaderMonitorSubmission,
-  LeaderMonitorKind,
   LeaderMonitorStatus,
   LeaderItemScore,
   LeaderFollowUpStatus,
@@ -17,6 +16,7 @@ import type {
   DailyReportSubmission,
   StaffReportValidationStatus,
   ValidateStaffReportPayload,
+  LeaderMonitorKind,
 } from "@/lib/types";
 import {
   getStaffCache,
@@ -24,6 +24,28 @@ import {
   listSubmissionsNeedingFix,
   getSubmissionById,
 } from "@/lib/staff-report-store";
+import {
+  DailyActivityStorageError,
+  isLeaderMonitoringDbConfigured,
+  lmListTemplates,
+  lmUpsertTemplate,
+  lmInsertSubmission,
+  lmUpdateSubmission,
+  lmGetSubmission,
+  lmListSubmissions,
+  lmCountTemplates,
+} from "@/lib/leader-monitoring-db";
+
+export { isLeaderMonitoringDbConfigured, DailyActivityStorageError };
+
+function assertReady(): void {
+  if (!isLeaderMonitoringDbConfigured()) {
+    throw new DailyActivityStorageError(
+      "Leader Monitoring storage belum dikonfigurasi. Set SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY.",
+      "NOT_CONFIGURED"
+    );
+  }
+}
 
 function nowISO() {
   return new Date().toISOString();
@@ -52,7 +74,7 @@ function ci(
   }));
 }
 
-const seedTemplates: LeaderMonitorTemplate[] = [
+const SEED_TEMPLATES: LeaderMonitorTemplate[] = [
   {
     id: "LMT-OPEN",
     kind: "opening_control",
@@ -194,40 +216,40 @@ const seedTemplates: LeaderMonitorTemplate[] = [
   },
 ];
 
-type StoreState = {
-  templates: LeaderMonitorTemplate[];
-  submissions: LeaderMonitorSubmission[];
-};
-
-const globalKey = "__nusa_leader_monitor_store_v1__";
-
-function getState(): StoreState {
-  const g = globalThis as unknown as Record<string, StoreState | undefined>;
-  if (!g[globalKey]) {
-    g[globalKey] = {
-      templates: seedTemplates.map((t) => ({ ...t, checklist: [...t.checklist] })),
-      submissions: [],
-    };
+/** Upsert template bawaan — aman dijalankan ulang. */
+export async function seedLeaderMonitorTemplates(): Promise<{ templates: number; ids: string[] }> {
+  assertReady();
+  for (const tpl of SEED_TEMPLATES) {
+    await lmUpsertTemplate(tpl);
   }
-  return g[globalKey]!;
+  return { templates: SEED_TEMPLATES.length, ids: SEED_TEMPLATES.map((t) => t.id) };
 }
 
-export function listLeaderMonitorTemplates(
+async function ensureTemplatesSeeded(): Promise<void> {
+  const count = await lmCountTemplates();
+  if (count === 0) {
+    await seedLeaderMonitorTemplates();
+  }
+}
+
+export async function listLeaderMonitorTemplates(
   outlet?: string
-): LeaderMonitorTemplate[] {
-  return getState()
-    .templates.filter((t) => t.active)
+): Promise<LeaderMonitorTemplate[]> {
+  assertReady();
+  await ensureTemplatesSeeded();
+  return (await lmListTemplates())
+    .filter((t) => t.active)
     .filter((t) => !t.outlet_id || !outlet || outlet === "ALL" || t.outlet_id === outlet)
     .sort((a, b) => a.sort_order - b.sort_order);
 }
 
-export function getLeaderMonitorTemplate(
+export async function getLeaderMonitorTemplate(
   idOrKind: string
-): LeaderMonitorTemplate | null {
-  const t = getState().templates.find(
-    (x) => x.id === idOrKind || x.kind === idOrKind
-  );
-  return t || null;
+): Promise<LeaderMonitorTemplate | null> {
+  assertReady();
+  await ensureTemplatesSeeded();
+  const templates = await lmListTemplates();
+  return templates.find((x) => x.id === idOrKind || x.kind === idOrKind) || null;
 }
 
 function computeStatusFromScores(
@@ -243,7 +265,9 @@ function computeStatusFromScores(
 export async function submitLeaderMonitor(
   payload: SubmitLeaderMonitorPayload
 ): Promise<{ success: true; data: LeaderMonitorSubmission } | { success: false; error: string }> {
-  const template = getState().templates.find((t) => t.id === payload.template_id);
+  assertReady();
+  await ensureTemplatesSeeded();
+  const template = (await lmListTemplates()).find((t) => t.id === payload.template_id);
   if (!template || !template.active) {
     return { success: false, error: "Template monitoring tidak ditemukan." };
   }
@@ -257,7 +281,6 @@ export async function submitLeaderMonitor(
     return { success: false, error: "Isi skor checklist (Aman / Catatan / Gagal)." };
   }
 
-  // Ensure all items scored; default missing to 2 if partial? Prefer require all.
   const scoreMap = new Map(scoresInput.map((s) => [s.item_id, s.score]));
   const checklist_scores = template.checklist.map((item) => {
     const score = scoreMap.has(item.id) ? (scoreMap.get(item.id) as LeaderItemScore) : 2;
@@ -270,7 +293,6 @@ export async function submitLeaderMonitor(
   let status = payload.status;
   if (checklist_scores.length > 0) {
     const derived = computeStatusFromScores(checklist_scores, status);
-    // Prefer worse of manual vs derived
     const rank: Record<LeaderMonitorStatus, number> = {
       aman: 0,
       ada_catatan: 1,
@@ -331,9 +353,8 @@ export async function submitLeaderMonitor(
     title: template.title,
   };
 
-  getState().submissions.push(submission);
+  await lmInsertSubmission(submission);
 
-  // Spot check / validation: mirror to staff submission if linked
   if (
     payload.staff_submission_id &&
     payload.staff_validation &&
@@ -352,44 +373,39 @@ export async function submitLeaderMonitor(
   return { success: true, data: submission };
 }
 
-export function updateLeaderMonitorFollowUp(
+export async function updateLeaderMonitorFollowUp(
   id: string,
   follow_up_status: LeaderFollowUpStatus,
   extra?: { problem_note?: string; fix_instruction?: string }
-): { success: true; data: LeaderMonitorSubmission } | { success: false; error: string } {
-  const sub = getState().submissions.find((s) => s.id === id);
+): Promise<
+  { success: true; data: LeaderMonitorSubmission } | { success: false; error: string }
+> {
+  assertReady();
+  const sub = await lmGetSubmission(id);
   if (!sub) return { success: false, error: "Laporan monitoring tidak ditemukan." };
   sub.follow_up_status = follow_up_status;
   if (extra?.problem_note !== undefined) sub.problem_note = extra.problem_note;
   if (extra?.fix_instruction !== undefined) sub.fix_instruction = extra.fix_instruction;
   sub.updated_at = nowISO();
+  await lmUpdateSubmission(sub);
   return { success: true, data: sub };
 }
 
-export function listLeaderMonitorSubmissions(
+export async function listLeaderMonitorSubmissions(
   filters: LeaderMonitorFilters = {}
-): LeaderMonitorSubmission[] {
-  const date = filters.date || todayISO();
-  return getState()
-    .submissions.filter((s) => s.report_date === date)
-    .filter((s) => !filters.outlet || filters.outlet === "ALL" || s.outlet_id === filters.outlet)
-    .filter((s) => !filters.kind || filters.kind === "ALL" || s.kind === filters.kind)
-    .filter(
-      (s) =>
-        !filters.follow_up ||
-        filters.follow_up === "ALL" ||
-        s.follow_up_status === filters.follow_up
-    )
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+): Promise<LeaderMonitorSubmission[]> {
+  assertReady();
+  return lmListSubmissions(filters);
 }
 
 export async function buildLeaderMonitorDashboard(
   filters: LeaderMonitorFilters = {}
 ): Promise<LeaderMonitorDashboardData> {
+  assertReady();
   const date = filters.date || todayISO();
   const outlet = filters.outlet;
-  const submissions = listLeaderMonitorSubmissions({ ...filters, date });
-  const templates = listLeaderMonitorTemplates(outlet);
+  const submissions = await listLeaderMonitorSubmissions({ ...filters, date });
+  const templates = await listLeaderMonitorTemplates(outlet);
 
   const staff_need_fix = (await listSubmissionsNeedingFix(date)).filter(
     (s) => !outlet || outlet === "ALL" || s.outlet_id === outlet

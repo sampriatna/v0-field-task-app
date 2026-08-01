@@ -153,10 +153,12 @@ console.log("[v0] Task data:", task)
 
 ## Environment Variables to Check
 
-Ensure these are set in `.env.development.local`:
+Ensure these are set in `.env.development.local` (never commit real values):
+
 ```
 GAS_WEB_APP_URL=https://script.google.com/macros/s/...
-ADMIN_PASSWORD=@Tukgumer123
+ADMIN_PASSWORD=[set-in-vercel-env-only]
+SESSION_SECRET=[generate-random-string]
 ```
 
 ## Recent Fixes Applied
