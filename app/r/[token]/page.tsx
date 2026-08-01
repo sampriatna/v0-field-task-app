@@ -139,8 +139,12 @@ export default function StaffStaticReportPage() {
     : 0;
   const totalCount = selectedTemplate?.checklist_items?.length || 0;
   const conditionNeedsNote =
-    statusCondition &&
-    REPORT_CONDITION_OPTIONS.find((o) => o.value === statusCondition)?.requiresNote;
+    Boolean(selectedTemplate?.requires_note) ||
+    Boolean(
+      statusCondition &&
+        REPORT_CONDITION_OPTIONS.find((o) => o.value === statusCondition)
+          ?.requiresNote
+    );
 
   const handleSubmit = async () => {
     if (!selectedTemplate || pageState === "submitting") return;
@@ -154,7 +158,11 @@ export default function StaffStaticReportPage() {
       return;
     }
     if (conditionNeedsNote && !note.trim()) {
-      alert("ISI CATATAN KENDALA");
+      alert(
+        selectedTemplate.requires_note
+          ? "ISI CATATAN HARIAN (wajib, boleh tulis: Tidak ada kendala)"
+          : "ISI CATATAN KENDALA"
+      );
       return;
     }
 
@@ -374,11 +382,18 @@ export default function StaffStaticReportPage() {
                 akhir → kendala (jika ada).
               </p>
             )}
+            {selectedTemplate.requires_note && (
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Catatan wajib. Jika kondisi normal, tulis &quot;Tidak ada kendala&quot;.
+              </p>
+            )}
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder={
-                positionGroup === "PA" || selectedTemplate.position_group === "PA"
+                selectedTemplate.requires_note
+                  ? "Ringkasan hari ini — atau tulis: Tidak ada kendala"
+                  : positionGroup === "PA" || selectedTemplate.position_group === "PA"
                   ? "Contoh: Toilet customer dibersihkan. Kloset disikat, lantai dipel, wastafel dilap, sampah dikosongkan. Kondisi akhir bersih, tidak bau. Kendala tidak ada."
                   : "Contoh: sabun tinggal sedikit"
               }

@@ -347,7 +347,9 @@ export type ReportTemplateCategory =
   | "Maintenance"
   | "Kendala"
   | "Special"
-  | "General";
+  | "General"
+  | "Quality Control"
+  | "Kasir";
 
 /** Jenis report: wajib harian | tugas khusus | quick kendala */
 export type ReportTemplateKind = "daily_required" | "special_task" | "issue_quick";
@@ -393,6 +395,8 @@ export interface ReportTemplate {
   /** Deskripsi singkat / tujuan — legacy alias display */
   description: string;
   requires_photo: boolean;
+  /** Catatan wajib meski status kondisi Aman (mis. catatan harian outlet) */
+  requires_note?: boolean;
   is_required_daily: boolean;
   kind: ReportTemplateKind;
   target_time_start?: string | null; // "09:00"
@@ -411,6 +415,7 @@ export interface CreateReportTemplatePayload {
   standard_result?: string;
   description?: string;
   requires_photo?: boolean;
+  requires_note?: boolean;
   is_required_daily?: boolean;
   kind?: ReportTemplateKind;
   target_time_start?: string | null;
@@ -429,6 +434,7 @@ export interface UpdateReportTemplatePayload {
   standard_result?: string;
   description?: string;
   requires_photo?: boolean;
+  requires_note?: boolean;
   is_required_daily?: boolean;
   kind?: ReportTemplateKind;
   target_time_start?: string | null;

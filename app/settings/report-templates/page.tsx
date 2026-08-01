@@ -51,6 +51,8 @@ const categories: ReportTemplateCategory[] = [
   "Kendala",
   "Special",
   "General",
+  "Quality Control",
+  "Kasir",
 ];
 
 type ChecklistDraft = { item_text: string; is_required: boolean };
