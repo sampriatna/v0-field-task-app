@@ -17,8 +17,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle2, Send, Copy, AlertTriangle, ExternalLink, User } from "lucide-react";
-import { createTask, buildReportLink, getStaff, getAreas, getCategories } from "@/lib/api";
+import { CheckCircle2, Send, Copy, AlertTriangle, ExternalLink, User, MessageCircle } from "lucide-react";
+import { createTask, buildReportLink, getStaff, getAreas, getCategories, resendWhatsApp } from "@/lib/api";
+import { buildTaskNotificationMessage, buildWaMeLink } from "@/lib/wa-message";
 import { outlets, priorities } from "@/lib/mock-data";
 import type { CreateTaskPayload, Outlet, Area, Category, TaskPriority, Task, Staff } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +50,7 @@ export default function CreateTaskPage() {
   const [selectedStaffId, setSelectedStaffId] = useState<string>("");
   const [deadline, setDeadline] = useState("");
   const [beforePhoto, setBeforePhoto] = useState<string | undefined>();
+  const [isResendingWa, setIsResendingWa] = useState(false);
 
   // Load staff data on mount
   useEffect(() => {
@@ -170,6 +172,44 @@ export default function CreateTaskPage() {
         ? buildReportLink(createdTask.task_id, createdTask.token)
         : "";
 
+    const waFailed = createdTask?.status === "WA_FAILED";
+    const waManualLink =
+      reportLink && picWa
+        ? buildWaMeLink(
+            picWa,
+            buildTaskNotificationMessage({
+              pic_name: picName,
+              task_title: createdTask?.task_title || taskTitle,
+              outlet: createdTask?.outlet || String(outlet),
+              area: createdTask?.area || String(area),
+              deadline: createdTask?.deadline || "",
+              report_link: reportLink,
+            })
+          )
+        : "";
+
+    const handleResendWa = async () => {
+      if (!createdTask?.task_id) return;
+      setIsResendingWa(true);
+      try {
+        const result = await resendWhatsApp(createdTask.task_id);
+        if (result.success) {
+          toast({
+            title: "Permintaan kirim ulang WA",
+            description: "GAS/Fonnte sedang memproses. Cek HP staff dalam 1–2 menit.",
+          });
+        } else {
+          toast({
+            title: "Gagal kirim ulang WA",
+            description: result.error || "Cek konfigurasi Fonnte di GAS",
+            variant: "destructive",
+          });
+        }
+      } finally {
+        setIsResendingWa(false);
+      }
+    };
+
     const copyLink = () => {
       if (reportLink) {
         navigator.clipboard?.writeText(reportLink);
@@ -189,9 +229,40 @@ export default function CreateTaskPage() {
             <h2 className="text-xl font-semibold text-foreground">
               Tugas Berhasil Dibuat
             </h2>
-            <p className="text-muted-foreground">
-              Notifikasi WhatsApp sedang diproses dan akan dikirim ke {picName}.
+            <p className="text-muted-foreground text-sm">
+              Tugas sudah tersimpan. Kirim link ke staff lewat WhatsApp — Fonnte otomatis juga jalan di background.
             </p>
+
+            {waManualLink ? (
+              <a href={waManualLink} className="block w-full">
+                <Button
+                  type="button"
+                  className="w-full h-12 text-base bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                >
+                  <MessageCircle className="w-5 h-5 mr-2" />
+                  Kirim ke WhatsApp — {picName}
+                </Button>
+              </a>
+            ) : null}
+
+            {waFailed && (
+              <div className="text-left bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-900">
+                Fonnte otomatis gagal. Gunakan tombol WhatsApp di atas untuk kirim manual.
+              </div>
+            )}
+
+            {createdTask?.task_id && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleResendWa}
+                disabled={isResendingWa}
+                className="text-muted-foreground"
+              >
+                {isResendingWa ? "Mengirim..." : "Coba kirim ulang via Fonnte (opsional)"}
+              </Button>
+            )}
 
             {hasToken && reportLink ? (
               <div className="text-left bg-muted/50 rounded-lg p-3 space-y-2">

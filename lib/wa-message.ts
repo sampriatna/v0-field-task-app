@@ -58,3 +58,33 @@ export function buildWaMeLink(waNumber: string, message: string): string {
   if (!wa) return "";
   return `https://wa.me/${wa}?text=${encodeURIComponent(message)}`;
 }
+
+export function buildTaskNotificationMessage(input: {
+  pic_name: string;
+  task_title: string;
+  outlet: string;
+  area: string;
+  deadline: string;
+  report_link: string;
+}): string {
+  const deadlineText = input.deadline
+    ? new Date(input.deadline).toLocaleString("id-ID", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "-";
+
+  return [
+    `Halo *${input.pic_name}*,`,
+    ``,
+    `Ada tugas baru untuk kamu:`,
+    `📋 *${input.task_title}*`,
+    `📍 ${input.outlet} — ${input.area}`,
+    `⏰ Deadline: ${deadlineText}`,
+    ``,
+    `Silakan buka link report berikut:`,
+    input.report_link,
+    ``,
+    `Terima kasih 🙏`,
+  ].join("\n");
+}
