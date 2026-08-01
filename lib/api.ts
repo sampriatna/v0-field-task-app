@@ -66,6 +66,93 @@ function normalizeTaskList(data: unknown): Task[] {
   return [];
 }
 
+function extractTokenFromReportLink(reportLink: string): { taskId?: string; token?: string } {
+  if (!reportLink) return {};
+  try {
+    const url = reportLink.startsWith("http")
+      ? new URL(reportLink)
+      : new URL(reportLink, "https://app.nf3.company");
+
+    const token = url.searchParams.get("token") || undefined;
+    const pathMatch = url.pathname.match(/\/report\/([^/?]+)/);
+    const taskId = pathMatch?.[1] || url.searchParams.get("task_id") || url.searchParams.get("taskId") || undefined;
+
+    if (!taskId && url.pathname === "/report" && url.search) {
+      const firstParam = url.search.slice(1).split("&")[0];
+      if (firstParam && !firstParam.includes("=") && firstParam.startsWith("TASK")) {
+        return { taskId: firstParam, token };
+      }
+    }
+
+    return { taskId, token };
+  } catch {
+    return {};
+  }
+}
+
+function normalizeTaskFromGAS(
+  data: unknown,
+  fallback?: Partial<CreateTaskPayload>
+): Task | null {
+  if (!data || typeof data !== "object") return null;
+
+  const root = data as Record<string, unknown>;
+  const nested = root.task ?? root.data;
+  const obj = (
+    nested && typeof nested === "object" && !Array.isArray(nested) ? nested : root
+  ) as Record<string, unknown>;
+
+  const reportLinkRaw = String(pickField(obj, ["report_link", "reportLink", "link"]) || "");
+  const fromLink = extractTokenFromReportLink(reportLinkRaw);
+
+  const taskId = String(
+    pickField(obj, ["task_id", "taskId", "id"]) || fromLink.taskId || ""
+  );
+  const token = String(
+    pickField(obj, ["token", "report_token", "checklist_token", "access_token"]) ||
+      fromLink.token ||
+      ""
+  );
+
+  if (!taskId && !token) return null;
+
+  return {
+    task_id: taskId,
+    token,
+    created_at: String(pickField(obj, ["created_at", "createdAt"]) || new Date().toISOString()),
+    created_by: String(pickField(obj, ["created_by", "createdBy"]) || "Admin"),
+    outlet: (pickField(obj, ["outlet"]) || fallback?.outlet || "KBU") as Task["outlet"],
+    area: (pickField(obj, ["area"]) || fallback?.area || "Dapur") as Task["area"],
+    category: (pickField(obj, ["category"]) || fallback?.category || "General") as Task["category"],
+    task_title: String(
+      pickField(obj, ["task_title", "taskTitle", "title"]) || fallback?.task_title || ""
+    ),
+    task_description: String(
+      pickField(obj, ["task_description", "taskDescription", "description"]) ||
+        fallback?.task_description ||
+        ""
+    ),
+    priority: (pickField(obj, ["priority"]) || fallback?.priority || "Medium") as Task["priority"],
+    pic_name: String(
+      pickField(obj, ["pic_name", "picName", "staff_name"]) || fallback?.pic_name || ""
+    ),
+    pic_wa: String(
+      pickField(obj, ["pic_wa", "picWa", "wa_number", "wa"]) || fallback?.pic_wa || ""
+    ),
+    deadline: String(pickField(obj, ["deadline"]) || fallback?.deadline || ""),
+    before_photo_url: pickField(obj, ["before_photo_url", "beforePhotoUrl"])
+      ? String(pickField(obj, ["before_photo_url", "beforePhotoUrl"]))
+      : undefined,
+    status: (pickField(obj, ["status"]) || "OPEN") as Task["status"],
+    report_link: reportLinkRaw,
+    is_late: coerceChecked(pickField(obj, ["is_late", "isLate"])),
+    last_updated: String(
+      pickField(obj, ["last_updated", "lastUpdated", "updated_at"]) ||
+        new Date().toISOString()
+    ),
+  };
+}
+
 // Normalize staff data from GAS (maps staff_name -> name, is_active -> status, etc.)
 function normalizeStaffFromGAS(gasStaff: Record<string, unknown>): Staff {
   return {
@@ -390,6 +477,13 @@ export async function createTask(payload: CreateTaskPayload): Promise<ApiRespons
       };
       newTask.report_link = `/report/${newTask.task_id}?token=${newTask.token}`;
       return { success: true, data: newTask };
+    }
+
+    if (result.success && result.data) {
+      const normalized = normalizeTaskFromGAS(result.data, payload);
+      if (normalized?.task_id && normalized.token) {
+        return { success: true, data: normalized };
+      }
     }
 
     return result;
