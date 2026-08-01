@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CheckCircle2, Send, Copy, AlertTriangle, ExternalLink, User } from "lucide-react";
+import { CheckCircle2, Send, Copy, AlertTriangle, ExternalLink, User, MessageCircle } from "lucide-react";
 import { createTask, buildReportLink, getStaff, getAreas, getCategories, resendWhatsApp } from "@/lib/api";
 import { buildTaskNotificationMessage, buildWaMeLink } from "@/lib/wa-message";
 import { outlets, priorities } from "@/lib/mock-data";
@@ -172,10 +172,7 @@ export default function CreateTaskPage() {
         ? buildReportLink(createdTask.task_id, createdTask.token)
         : "";
 
-    const waStatus = createdTask?.status;
-    const waSentAt = createdTask?.wa_sent_at;
-    const waFailed = waStatus === "WA_FAILED";
-    const waPending = !waSentAt && !waFailed;
+    const waFailed = createdTask?.status === "WA_FAILED";
     const waManualLink =
       reportLink && picWa
         ? buildWaMeLink(
@@ -232,40 +229,39 @@ export default function CreateTaskPage() {
             <h2 className="text-xl font-semibold text-foreground">
               Tugas Berhasil Dibuat
             </h2>
-            <p className="text-muted-foreground">
-              {waFailed
-                ? `WhatsApp otomatis ke ${picName} gagal. Kirim manual atau coba kirim ulang.`
-                : waSentAt
-                  ? `Permintaan WA ke ${picName} sudah dikirim ke Fonnte (${new Date(waSentAt).toLocaleTimeString("id-ID")}). Cek HP staff — status "unknown" di Fonnte = belum sampai.`
-                  : `WhatsApp ke ${picName} sedang diproses via GAS/Fonnte. Jika 2 menit belum masuk, gunakan opsi di bawah.`}
+            <p className="text-muted-foreground text-sm">
+              Tugas sudah tersimpan. Kirim link ke staff lewat WhatsApp — Fonnte otomatis juga jalan di background.
             </p>
 
-            {(waFailed || waPending) && (
-              <div className="text-left bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
-                <p className="text-sm text-amber-900">
-                  WA dikirim dari <strong>Google Apps Script + Fonnte</strong>, bukan dari app langsung.
-                  Pastikan nomor staff format <strong>628xxx</strong> dan token Fonnte aktif di GAS.
-                </p>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleResendWa}
-                    disabled={isResendingWa || !createdTask?.task_id}
-                    className="flex-1"
-                  >
-                    {isResendingWa ? "Mengirim..." : "Kirim Ulang via Fonnte"}
-                  </Button>
-                  {waManualLink ? (
-                    <a href={waManualLink} target="_blank" rel="noopener noreferrer" className="flex-1">
-                      <Button type="button" variant="outline" size="sm" className="w-full">
-                        Kirim Manual (wa.me)
-                      </Button>
-                    </a>
-                  ) : null}
-                </div>
+            {waManualLink ? (
+              <a href={waManualLink} className="block w-full">
+                <Button
+                  type="button"
+                  className="w-full h-12 text-base bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                >
+                  <MessageCircle className="w-5 h-5 mr-2" />
+                  Kirim ke WhatsApp — {picName}
+                </Button>
+              </a>
+            ) : null}
+
+            {waFailed && (
+              <div className="text-left bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-900">
+                Fonnte otomatis gagal. Gunakan tombol WhatsApp di atas untuk kirim manual.
               </div>
+            )}
+
+            {createdTask?.task_id && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleResendWa}
+                disabled={isResendingWa}
+                className="text-muted-foreground"
+              >
+                {isResendingWa ? "Mengirim..." : "Coba kirim ulang via Fonnte (opsional)"}
+              </Button>
             )}
 
             {hasToken && reportLink ? (
