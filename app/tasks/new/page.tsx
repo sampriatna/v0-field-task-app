@@ -24,6 +24,42 @@ import { outlets, priorities } from "@/lib/mock-data";
 import type { CreateTaskPayload, Outlet, Area, Category, TaskPriority, Task, Staff } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
+const TASK_SUCCESS_KEY = "nusa_task_create_success";
+
+interface TaskSuccessSnapshot {
+  createdTask: Task;
+  picName: string;
+  picWa: string;
+  taskTitle: string;
+  outlet: string;
+  area: string;
+}
+
+function saveTaskSuccess(snapshot: TaskSuccessSnapshot) {
+  try {
+    sessionStorage.setItem(TASK_SUCCESS_KEY, JSON.stringify(snapshot));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+function loadTaskSuccess(): TaskSuccessSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(TASK_SUCCESS_KEY);
+    return raw ? (JSON.parse(raw) as TaskSuccessSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearTaskSuccess() {
+  try {
+    sessionStorage.removeItem(TASK_SUCCESS_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function CreateTaskPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -51,10 +87,21 @@ export default function CreateTaskPage() {
   const [deadline, setDeadline] = useState("");
   const [beforePhoto, setBeforePhoto] = useState<string | undefined>();
 
-  // Load staff data on mount
+  // Load staff + restore success screen after refresh (sessionStorage)
   useEffect(() => {
     loadStaff();
     loadMasterData();
+
+    const saved = loadTaskSuccess();
+    if (saved?.createdTask?.task_id && saved.createdTask.token) {
+      setCreatedTask(saved.createdTask);
+      setPicName(saved.picName);
+      setPicWa(saved.picWa);
+      setTaskTitle(saved.taskTitle);
+      if (saved.outlet) setOutlet(saved.outlet as Outlet);
+      if (saved.area) setArea(saved.area as Area);
+      setIsSuccess(true);
+    }
   }, []);
 
   const loadMasterData = async () => {
@@ -144,6 +191,16 @@ export default function CreateTaskPage() {
         console.log("[v0] created report_link (raw):", created?.report_link);
         setCreatedTask(created);
         setIsSuccess(true);
+        if (created) {
+          saveTaskSuccess({
+            createdTask: created,
+            picName,
+            picWa,
+            taskTitle,
+            outlet: String(outlet),
+            area: String(area),
+          });
+        }
       } else {
         toast({
           title: "Gagal membuat tugas",
@@ -213,15 +270,16 @@ export default function CreateTaskPage() {
             </p>
 
             {reportLink && waManualLink ? (
-              <a href={waManualLink} className="block w-full">
-                <Button
-                  type="button"
-                  className="w-full h-14 text-base font-semibold bg-[#25D366] hover:bg-[#20BD5A] text-white shadow-md"
-                >
-                  <MessageCircle className="w-6 h-6 mr-2" />
-                  Kirim ke WhatsApp — {staffName}
-                </Button>
-              </a>
+              <Button
+                type="button"
+                className="w-full h-14 text-base font-semibold bg-[#25D366] hover:bg-[#20BD5A] text-white shadow-md"
+                onClick={() => {
+                  window.location.href = waManualLink;
+                }}
+              >
+                <MessageCircle className="w-6 h-6 mr-2" />
+                Kirim ke WhatsApp — {staffName}
+              </Button>
             ) : reportLink ? (
               <div className="text-left bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-900">
                 Nomor WA staff tidak ditemukan. Salin link report di bawah lalu kirim manual ke staff.
@@ -275,6 +333,7 @@ export default function CreateTaskPage() {
               <Button
                 variant="outline"
                 onClick={() => {
+                  clearTaskSuccess();
                   setIsSuccess(false);
                   setCreatedTask(null);
                   setOutlet("");
@@ -294,7 +353,13 @@ export default function CreateTaskPage() {
               >
                 Buat Lagi
               </Button>
-              <Button onClick={() => router.push("/dashboard")} className="flex-1">
+              <Button
+                onClick={() => {
+                  clearTaskSuccess();
+                  router.push("/dashboard");
+                }}
+                className="flex-1"
+              >
                 Ke Dashboard
               </Button>
             </div>
