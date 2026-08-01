@@ -64,10 +64,18 @@ function matchesPositionGroup(
 ): boolean {
   if (!templateGroup) return true;
   const staffGroup = normalizePositionGroup(staffPosition);
-  const tpl = templateGroup.trim().toLowerCase();
-  if (staffGroup.toLowerCase() === tpl) return true;
-  // also allow raw position match
-  return staffPosition.trim().toLowerCase() === tpl;
+  const tplGroup = normalizePositionGroup(templateGroup);
+  if (
+    staffGroup &&
+    tplGroup &&
+    staffGroup.toLowerCase() === tplGroup.toLowerCase()
+  ) {
+    return true;
+  }
+  // also allow raw position match (trim + case-insensitive)
+  return (
+    staffPosition.trim().toLowerCase() === templateGroup.trim().toLowerCase()
+  );
 }
 
 const seedStaff: Staff[] = [
@@ -120,6 +128,18 @@ const seedStaff: Staff[] = [
     updated_at: nowISO(),
   },
   {
+    staff_id: "STF-HANA",
+    name: "Hana Hadi Sutrisno",
+    position: "Outlet crew",
+    outlet: "Samtaro Express",
+    area: "Floor",
+    wa_number: "6281110001999",
+    role: "STAFF",
+    status: "ACTIVE",
+    created_at: nowISO(),
+    updated_at: nowISO(),
+  },
+  {
     staff_id: "STF-L01",
     name: "Leader KBU",
     position: "Leader",
@@ -153,6 +173,7 @@ type SeedDef = {
   outlet_id?: string | null;
   standard_result: string;
   requires_photo: boolean;
+  requires_note?: boolean;
   is_required_daily: boolean;
   kind?: ReportTemplateKind;
   target_time_start?: string;
@@ -170,6 +191,7 @@ function seedDefFromV2(def: DailyActivitySeedDef): SeedDef {
     outlet_id: def.outlet_code ?? null,
     standard_result: def.standard_result,
     requires_photo: def.requires_photo,
+    requires_note: Boolean(def.requires_note),
     is_required_daily: def.is_required_daily,
     kind: def.kind,
     target_time_start: def.target_time_start,
@@ -197,6 +219,7 @@ function buildSeed(defs: SeedDef[]): {
       standard_result: d.standard_result,
       description: d.standard_result,
       requires_photo: d.requires_photo,
+      requires_note: Boolean(d.requires_note),
       is_required_daily: d.is_required_daily,
       kind: d.kind ?? (d.is_required_daily ? "daily_required" : "special_task"),
       target_time_start: d.target_time_start ?? null,
@@ -232,6 +255,8 @@ const seedTokenAni =
   "c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff001122";
 const seedTokenDedi =
   "d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00112233";
+const seedTokenHana =
+  "e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff0011223344";
 
 type StoreState = {
   links: StaffReportLink[];
@@ -281,6 +306,15 @@ function getState(): StoreState {
           staff_id: "STF-004",
           token: seedTokenDedi,
           short_code: "dedi",
+          is_active: true,
+          created_at: nowISO(),
+          revoked_at: null,
+        },
+        {
+          id: "SRL-005",
+          staff_id: "STF-HANA",
+          token: seedTokenHana,
+          short_code: "hana",
           is_active: true,
           created_at: nowISO(),
           revoked_at: null,
@@ -476,6 +510,7 @@ export function createReportTemplate(
     standard_result: (payload.standard_result || payload.description || "").trim(),
     description: (payload.description || payload.standard_result || "").trim(),
     requires_photo: Boolean(payload.requires_photo),
+    requires_note: Boolean(payload.requires_note),
     is_required_daily: Boolean(payload.is_required_daily),
     kind:
       payload.kind ||
@@ -509,6 +544,8 @@ export function updateReportTemplate(
     template.position_group = payload.position_group;
   if (payload.requires_photo !== undefined)
     template.requires_photo = payload.requires_photo;
+  if (payload.requires_note !== undefined)
+    template.requires_note = payload.requires_note;
   if (payload.is_required_daily !== undefined)
     template.is_required_daily = payload.is_required_daily;
   if (payload.kind !== undefined) template.kind = payload.kind;
@@ -670,6 +707,12 @@ export function submitDailyReport(input: {
   }
 
   const note = (input.note || "").trim();
+  if (template.requires_note && !note) {
+    return {
+      success: false,
+      error: "Catatan wajib diisi untuk kegiatan ini.",
+    };
+  }
   if (isIssueCondition(input.status_condition) && !note) {
     return {
       success: false,
@@ -959,6 +1002,7 @@ export function seedDailyActivityTemplates(): {
       existing.standard_result = tpl.standard_result;
       existing.description = tpl.description;
       existing.requires_photo = tpl.requires_photo;
+      existing.requires_note = Boolean(tpl.requires_note);
       existing.is_required_daily = tpl.is_required_daily;
       existing.kind = tpl.kind;
       existing.target_time_start = tpl.target_time_start;

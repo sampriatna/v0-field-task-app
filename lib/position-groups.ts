@@ -9,6 +9,7 @@ export const REPORT_POSITION_GROUPS = [
   "Dapur",
   "PA",
   "Kasir",
+  "OutletCrew",
   "Purchasing",
   "Gudang",
   "ProduksiFnB",
@@ -28,6 +29,7 @@ export const POSITION_GROUP_LABELS: Record<ReportPositionGroup, string> = {
   Dapur: "Dapur / Kitchen",
   PA: "PA / OB (Public Area)",
   Kasir: "Kasir",
+  OutletCrew: "Outlet Crew",
   Purchasing: "Purchasing / Pembelian",
   Gudang: "Warehouse / Gudang",
   ProduksiFnB: "Produksi FnB",
@@ -43,6 +45,11 @@ function matchesAny(text: string, keywords: string[]): boolean {
   return keywords.some((k) => text === k || text.includes(k));
 }
 
+/** Compact jabatan for exact/alias match (ignore case + whitespace). */
+function compactPosition(position: string): string {
+  return (position || "").trim().toLowerCase().replace(/\s+/g, "");
+}
+
 /** Map jabatan staff (teks bebas) → position_group template */
 export function normalizePositionGroup(position: string): string {
   const p = (position || "").trim().toLowerCase();
@@ -52,6 +59,18 @@ export function normalizePositionGroup(position: string): string {
     (group) => group.toLowerCase() === p
   );
   if (exact) return exact;
+
+  // Outlet crew (mini outlet) — jangan dipetakan ke Kasir/Bar/Dapur/Waiters.
+  // Kenali: "Outlet crew", "Outlet Crew", "OUTLET CREW", "outletcrew".
+  const compact = compactPosition(position);
+  if (
+    compact === "outletcrew" ||
+    compact === "outletcrews" ||
+    p === "outlet crew" ||
+    p === "outlet crews"
+  ) {
+    return "OutletCrew";
+  }
 
   if (
     matchesAny(p, [
