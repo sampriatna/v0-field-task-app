@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       outlet_id: body.outlet_id || session?.userOutlet || body.outlet_id,
     };
 
-    const result = submitLeaderMonitor(payload);
+    const result = await submitLeaderMonitor(payload);
     if (!result.success) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 });
     }

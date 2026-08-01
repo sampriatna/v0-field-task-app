@@ -1,24 +1,20 @@
 import { NextResponse } from "next/server";
-import { getSession, isAuthenticated } from "@/lib/auth";
 import { seedDailyActivityTemplates } from "@/lib/staff-report-store";
+import {
+  requireDailyActivityAdmin,
+  isSessionPayload,
+} from "@/lib/staff-report-api-auth";
+import { dailyActivityStorageErrorResponse } from "@/lib/staff-report-api-utils";
 
 /** Admin: upsert template kegiatan harian dari seed v2. */
 export async function POST() {
-  const session = await getSession();
-  if (!isAuthenticated(session)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await requireDailyActivityAdmin();
+  if (!isSessionPayload(session)) return session;
 
   try {
-    const result = seedDailyActivityTemplates();
+    const result = await seedDailyActivityTemplates();
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Seed template gagal",
-      },
-      { status: 500 }
-    );
+    return dailyActivityStorageErrorResponse(error);
   }
 }

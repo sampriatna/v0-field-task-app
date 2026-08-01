@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
-import { getSession, isAuthenticated } from "@/lib/auth";
 import { normalizeStaffPositionsInCache } from "@/lib/staff-report-store";
+import {
+  requireDailyActivityAdmin,
+  isSessionPayload,
+} from "@/lib/staff-report-api-auth";
+import { dailyActivityStorageErrorResponse } from "@/lib/staff-report-api-utils";
 import type { Staff } from "@/lib/types";
 
 /**
@@ -9,10 +13,8 @@ import type { Staff } from "@/lib/types";
  * Persist ke GAS dilakukan di client via updateStaff per baris yang berubah.
  */
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!isAuthenticated(session)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await requireDailyActivityAdmin();
+  if (!isSessionPayload(session)) return session;
 
   try {
     let staff: Staff[] | undefined;
@@ -23,7 +25,7 @@ export async function POST(request: Request) {
       staff = undefined;
     }
 
-    const result = normalizeStaffPositionsInCache(staff);
+    const result = await normalizeStaffPositionsInCache(staff);
     return NextResponse.json({
       success: true,
       data: {
@@ -35,12 +37,6 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : "Normalisasi gagal",
-      },
-      { status: 500 }
-    );
+    return dailyActivityStorageErrorResponse(error);
   }
 }

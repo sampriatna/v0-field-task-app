@@ -1,23 +1,21 @@
 import { NextResponse } from "next/server";
-import { getSession, isAuthenticated } from "@/lib/auth";
 import {
   listStaffReportLinks,
   generateStaffReportLink,
   setStaffCache,
 } from "@/lib/staff-report-store";
+import {
+  requireDailyActivityAdmin,
+  isSessionPayload,
+} from "@/lib/staff-report-api-auth";
+import { dailyActivityStorageErrorResponse } from "@/lib/staff-report-api-utils";
 import type { Staff } from "@/lib/types";
-
-async function requireAdmin() {
-  const session = await getSession();
-  if (!isAuthenticated(session)) return null;
-  return session;
-}
 
 function originFromRequest(request: Request): string {
   return new URL(request.url).origin;
 }
 
-function applyStaffFromBody(body: Record<string, unknown>) {
+async function applyStaffFromBody(body: Record<string, unknown>) {
   if (!Array.isArray(body.staff)) return;
   const staff = (body.staff as Record<string, unknown>[])
     .map((s) => ({
@@ -33,28 +31,30 @@ function applyStaffFromBody(body: Record<string, unknown>) {
       updated_at: String(s.updated_at || ""),
     }))
     .filter((s) => s.staff_id);
-  if (staff.length > 0) setStaffCache(staff);
+  if (staff.length > 0) await setStaffCache(staff);
 }
 
 export async function GET(request: Request) {
-  if (!(await requireAdmin())) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await requireDailyActivityAdmin();
+  if (!isSessionPayload(session)) return session;
 
-  return NextResponse.json({
-    success: true,
-    data: listStaffReportLinks(originFromRequest(request)),
-  });
+  try {
+    return NextResponse.json({
+      success: true,
+      data: await listStaffReportLinks(originFromRequest(request)),
+    });
+  } catch (error) {
+    return dailyActivityStorageErrorResponse(error);
+  }
 }
 
 export async function POST(request: Request) {
-  if (!(await requireAdmin())) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await requireDailyActivityAdmin();
+  if (!isSessionPayload(session)) return session;
 
   try {
     const body = await request.json();
-    applyStaffFromBody(body);
+    await applyStaffFromBody(body);
 
     const staffId = String(body.staff_id || "");
     if (!staffId) {
@@ -64,15 +64,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = generateStaffReportLink(staffId, originFromRequest(request));
+    const result = await generateStaffReportLink(staffId, originFromRequest(request));
     if (!result.success) {
       return NextResponse.json(result, { status: 400 });
     }
     return NextResponse.json(result);
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid request body" },
-      { status: 400 }
-    );
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
+    return dailyActivityStorageErrorResponse(error);
   }
 }

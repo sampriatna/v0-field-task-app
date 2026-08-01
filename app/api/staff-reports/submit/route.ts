@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { submitDailyReport } from "@/lib/staff-report-store";
 import { notifyLeadersOnKendala } from "@/lib/wa-notify-daily-report";
+import { dailyActivityStorageErrorResponse } from "@/lib/staff-report-api-utils";
 import type { ReportConditionStatus } from "@/lib/types";
 
 /**
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = submitDailyReport({
+    const result = await submitDailyReport({
       token,
       report_template_id: reportTemplateId,
       status_condition: statusCondition,
@@ -78,10 +79,7 @@ export async function POST(request: Request) {
       data: submission,
       notify,
     });
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid request body" },
-      { status: 400 }
-    );
+  } catch (error) {
+    return dailyActivityStorageErrorResponse(error);
   }
 }

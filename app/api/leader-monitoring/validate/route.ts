@@ -11,7 +11,7 @@ export async function POST(request: Request) {
 
   try {
     const body = (await request.json()) as ValidateStaffReportPayload;
-    const result = validateStaffReportFromLeader({
+    const result = await validateStaffReportFromLeader({
       ...body,
       leader_id: body.leader_id || session?.userId || "LEADER",
       leader_name: body.leader_name || session?.userName || "Leader",

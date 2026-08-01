@@ -1,25 +1,29 @@
 import { NextResponse } from "next/server";
-import { getSession, isAuthenticated } from "@/lib/auth";
 import {
   listReportTemplates,
   createReportTemplate,
 } from "@/lib/staff-report-store";
+import {
+  requireDailyActivityAdmin,
+  isSessionPayload,
+} from "@/lib/staff-report-api-auth";
+import { dailyActivityStorageErrorResponse } from "@/lib/staff-report-api-utils";
 import type { ReportTemplateCategory, ReportTemplateKind } from "@/lib/types";
 
 export async function GET() {
-  const session = await getSession();
-  if (!isAuthenticated(session)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await requireDailyActivityAdmin();
+  if (!isSessionPayload(session)) return session;
 
-  return NextResponse.json({ success: true, data: listReportTemplates() });
+  try {
+    return NextResponse.json({ success: true, data: await listReportTemplates() });
+  } catch (error) {
+    return dailyActivityStorageErrorResponse(error);
+  }
 }
 
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!isAuthenticated(session)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await requireDailyActivityAdmin();
+  if (!isSessionPayload(session)) return session;
 
   try {
     const body = await request.json();
@@ -45,7 +49,7 @@ export async function POST(request: Request) {
           .filter((i: { item_text: string }) => i.item_text)
       : [];
 
-    const template = createReportTemplate({
+    const template = await createReportTemplate({
       title: String(body.title),
       category: (body.category as ReportTemplateCategory) || "General",
       description: body.description ? String(body.description) : "",
@@ -65,6 +69,7 @@ export async function POST(request: Request) {
           ? null
           : String(body.position_group),
       requires_photo: Boolean(body.requires_photo),
+      requires_note: Boolean(body.requires_note),
       is_required_daily: Boolean(body.is_required_daily),
       kind: (body.kind as ReportTemplateKind) || undefined,
       target_time_start: body.target_time_start ? String(body.target_time_start) : null,
@@ -75,10 +80,13 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true, data: template });
-  } catch {
-    return NextResponse.json(
-      { success: false, error: "Invalid request body" },
-      { status: 400 }
-    );
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { success: false, error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
+    return dailyActivityStorageErrorResponse(error);
   }
 }

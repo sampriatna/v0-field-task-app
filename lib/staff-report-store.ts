@@ -26,8 +26,46 @@ import {
   DAILY_ACTIVITY_SEED_TEMPLATES,
   type DailyActivitySeedDef,
 } from "./daily-activity-seed-data";
+import {
+  isDailyActivityDbConfigured,
+  DailyActivityStorageError,
+  dbUpsertStaff,
+  dbGetStaff,
+  dbGetStaffById,
+  dbListLinks,
+  dbGetLinkByToken,
+  dbInsertLink,
+  dbUpdateLink,
+  dbRevokeActiveLinksForStaff,
+  dbListTemplates,
+  dbUpsertTemplate,
+  dbDeleteChecklistItemsForTemplate,
+  dbInsertChecklistItems,
+  dbListChecklistItems,
+  dbListSubmissionsByDate,
+  dbListSubmissionsForStaffOnDate,
+  dbGetSubmission,
+  dbFindSubmission,
+  dbUpsertSubmission,
+  dbUpdateSubmissionValidation,
+  dbDeleteAnswersForSubmission,
+  dbInsertAnswers,
+  dbListAnswersForSubmissions,
+  dbListSubmissionsNeedingFix,
+  dbCountActiveLinksWithShortCode,
+} from "./daily-activity-db";
 
 export { normalizePositionGroup } from "./position-groups";
+export { isDailyActivityDbConfigured, DailyActivityStorageError };
+
+function assertStorageReady(): void {
+  if (!isDailyActivityDbConfigured()) {
+    throw new DailyActivityStorageError(
+      "Daily Activity storage belum dikonfigurasi. Set SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY.",
+      "NOT_CONFIGURED"
+    );
+  }
+}
 
 function todayISO(): string {
   const d = new Date();
@@ -46,7 +84,6 @@ export function generateReportToken(): string {
   return randomBytes(32).toString("hex");
 }
 
-/** Nama → slug pendek: "DUL" → "dul", "Budi Santoso" → "budisantoso" */
 export function slugifyStaffName(name: string): string {
   const raw = (name || "")
     .toLowerCase()
@@ -72,98 +109,10 @@ function matchesPositionGroup(
   ) {
     return true;
   }
-  // also allow raw position match (trim + case-insensitive)
   return (
     staffPosition.trim().toLowerCase() === templateGroup.trim().toLowerCase()
   );
 }
-
-const seedStaff: Staff[] = [
-  {
-    staff_id: "STF-001",
-    name: "Budi Santoso",
-    position: "Cook",
-    outlet: "KBU",
-    area: "Dapur",
-    wa_number: "6281234567890",
-    role: "STAFF",
-    status: "ACTIVE",
-    created_at: nowISO(),
-    updated_at: nowISO(),
-  },
-  {
-    staff_id: "STF-002",
-    name: "Ani Wijaya",
-    position: "Barista",
-    outlet: "Kisamen",
-    area: "Bar",
-    wa_number: "6281234567891",
-    role: "STAFF",
-    status: "ACTIVE",
-    created_at: nowISO(),
-    updated_at: nowISO(),
-  },
-  {
-    staff_id: "STF-003",
-    name: "Rina Putri",
-    position: "Server",
-    outlet: "KBU",
-    area: "Floor",
-    wa_number: "6281234567892",
-    role: "STAFF",
-    status: "ACTIVE",
-    created_at: nowISO(),
-    updated_at: nowISO(),
-  },
-  {
-    staff_id: "STF-004",
-    name: "Dedi Pratama",
-    position: "PA",
-    outlet: "KBU",
-    area: "Outdoor",
-    wa_number: "6281234567893",
-    role: "STAFF",
-    status: "ACTIVE",
-    created_at: nowISO(),
-    updated_at: nowISO(),
-  },
-  {
-    staff_id: "STF-HANA",
-    name: "Hana Hadi Sutrisno",
-    position: "Outlet crew",
-    outlet: "Samtaro Express",
-    area: "Floor",
-    wa_number: "6281110001999",
-    role: "STAFF",
-    status: "ACTIVE",
-    created_at: nowISO(),
-    updated_at: nowISO(),
-  },
-  {
-    staff_id: "STF-L01",
-    name: "Leader KBU",
-    position: "Leader",
-    outlet: "KBU",
-    area: "Floor",
-    wa_number: "6281110001001",
-    role: "LEADER",
-    status: "ACTIVE",
-    created_at: nowISO(),
-    updated_at: nowISO(),
-  },
-  {
-    staff_id: "STF-L02",
-    name: "Leader Kisamen",
-    position: "Leader",
-    outlet: "Kisamen",
-    area: "Bar",
-    wa_number: "6281110001002",
-    role: "LEADER",
-    status: "ACTIVE",
-    created_at: nowISO(),
-    updated_at: nowISO(),
-  },
-];
 
 type SeedDef = {
   id: string;
@@ -242,210 +191,114 @@ function buildSeed(defs: SeedDef[]): {
   return { templates, items };
 }
 
-const { templates: seedTemplates, items: seedChecklistItems } = buildSeed(
-  DAILY_ACTIVITY_SEED_TEMPLATES.map(seedDefFromV2)
-);
-
-
-const seedTokenBudi =
-  "a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00";
-const seedTokenRina =
-  "b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff0011";
-const seedTokenAni =
-  "c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff001122";
-const seedTokenDedi =
-  "d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00112233";
-const seedTokenHana =
-  "e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff0011223344";
-
-type StoreState = {
-  links: StaffReportLink[];
-  templates: ReportTemplate[];
-  checklistItems: ReportTemplateChecklistItem[];
-  submissions: DailyReportSubmission[];
-  answers: DailyReportChecklistAnswer[];
-  staffCache: Staff[];
-};
-
-const globalKey = "__nusa_staff_report_store_v6_v2port__";
-
-function getState(): StoreState {
-  const g = globalThis as unknown as Record<string, StoreState | undefined>;
-  if (!g[globalKey]) {
-    g[globalKey] = {
-      links: [
-        {
-          id: "SRL-001",
-          staff_id: "STF-001",
-          token: seedTokenBudi,
-          short_code: "budi",
-          is_active: true,
-          created_at: nowISO(),
-          revoked_at: null,
-        },
-        {
-          id: "SRL-002",
-          staff_id: "STF-003",
-          token: seedTokenRina,
-          short_code: "rina",
-          is_active: true,
-          created_at: nowISO(),
-          revoked_at: null,
-        },
-        {
-          id: "SRL-003",
-          staff_id: "STF-002",
-          token: seedTokenAni,
-          short_code: "ani",
-          is_active: true,
-          created_at: nowISO(),
-          revoked_at: null,
-        },
-        {
-          id: "SRL-004",
-          staff_id: "STF-004",
-          token: seedTokenDedi,
-          short_code: "dedi",
-          is_active: true,
-          created_at: nowISO(),
-          revoked_at: null,
-        },
-        {
-          id: "SRL-005",
-          staff_id: "STF-HANA",
-          token: seedTokenHana,
-          short_code: "hana",
-          is_active: true,
-          created_at: nowISO(),
-          revoked_at: null,
-        },
-      ],
-      templates: [...seedTemplates],
-      checklistItems: [...seedChecklistItems],
-      submissions: [],
-      answers: [],
-      staffCache: [...seedStaff],
-    };
-  }
-  return g[globalKey]!;
+export async function setStaffCache(staff: Staff[]): Promise<void> {
+  assertStorageReady();
+  if (staff.length > 0) await dbUpsertStaff(staff);
 }
 
-function ensureUniqueShortCode(base: string, excludeLinkId?: string): string {
+export async function getStaffCache(): Promise<Staff[]> {
+  assertStorageReady();
+  return dbGetStaff();
+}
+
+async function findStaff(staffId: string): Promise<Staff | undefined> {
+  const staff = await dbGetStaffById(staffId);
+  return staff ?? undefined;
+}
+
+export async function getChecklistItemsForTemplate(
+  templateId: string
+): Promise<ReportTemplateChecklistItem[]> {
+  assertStorageReady();
+  return dbListChecklistItems(templateId);
+}
+
+export async function enrichTemplate(template: ReportTemplate): Promise<ReportTemplate> {
+  return {
+    ...template,
+    checklist_items: await getChecklistItemsForTemplate(template.id),
+  };
+}
+
+export async function matchTemplatesForStaff(
+  outlet: string,
+  position: string,
+  templates?: ReportTemplate[]
+): Promise<ReportTemplate[]> {
+  assertStorageReady();
+  const list = (templates ?? (await dbListTemplates())).filter((t) => t.active);
+  const matched = list
+    .filter((t) => {
+      const outletOk = !t.outlet_id || t.outlet_id === outlet;
+      const positionOk = matchesPositionGroup(t.position_group, position);
+      return outletOk && positionOk;
+    })
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  return Promise.all(matched.map(enrichTemplate));
+}
+
+async function ensureUniqueShortCode(
+  base: string,
+  excludeLinkId?: string
+): Promise<string> {
   let code = base || "staff";
   let n = 0;
-  const links = getState().links;
-  while (
-    links.some(
-      (l) => l.is_active && l.short_code === code && l.id !== excludeLinkId
-    )
-  ) {
+  while ((await dbCountActiveLinksWithShortCode(code, excludeLinkId)) > 0) {
     n += 1;
     code = `${base}${n}`;
   }
   return code;
 }
 
-/** Pastikan link punya short_code (migrasi link lama). */
-function ensureLinkShortCode(link: StaffReportLink): StaffReportLink {
+async function ensureLinkShortCode(link: StaffReportLink): Promise<StaffReportLink> {
   if (link.short_code) return link;
-  const staff = findStaff(link.staff_id);
+  const staff = await findStaff(link.staff_id);
   const base = slugifyStaffName(staff?.name || link.staff_id);
-  link.short_code = ensureUniqueShortCode(base, link.id);
+  link.short_code = await ensureUniqueShortCode(base, link.id);
+  await dbUpdateLink(link);
   return link;
 }
 
-export function setStaffCache(staff: Staff[]): void {
-  if (staff.length > 0) getState().staffCache = staff;
-}
-
-export function getStaffCache(): Staff[] {
-  return getState().staffCache;
-}
-
-function findStaff(staffId: string): Staff | undefined {
-  return getState().staffCache.find((s) => s.staff_id === staffId);
-}
-
-export function getChecklistItemsForTemplate(
-  templateId: string
-): ReportTemplateChecklistItem[] {
-  return getState()
-    .checklistItems.filter((i) => i.report_template_id === templateId)
-    .sort((a, b) => a.sort_order - b.sort_order);
-}
-
-export function enrichTemplate(template: ReportTemplate): ReportTemplate {
-  return {
-    ...template,
-    checklist_items: getChecklistItemsForTemplate(template.id),
-  };
-}
-
-export function matchTemplatesForStaff(
-  outlet: string,
-  position: string,
-  templates?: ReportTemplate[]
-): ReportTemplate[] {
-  const list = (templates ?? getState().templates).filter((t) => t.active);
-  return list
-    .filter((t) => {
-      const outletOk = !t.outlet_id || t.outlet_id === outlet;
-      const positionOk = matchesPositionGroup(t.position_group, position);
-      return outletOk && positionOk;
-    })
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .map(enrichTemplate);
-}
-
-function enrichLink(link: StaffReportLink, origin?: string): StaffReportLink {
-  ensureLinkShortCode(link);
-  const staff = findStaff(link.staff_id);
+async function enrichLink(link: StaffReportLink, origin?: string): Promise<StaffReportLink> {
+  const withCode = await ensureLinkShortCode(link);
+  const staff = await findStaff(withCode.staff_id);
   const base = origin || "";
   return {
-    ...link,
+    ...withCode,
     staff_name: staff?.name,
     outlet: staff?.outlet,
     position: staff?.position,
-    report_url: `${base}/r/${link.short_code}`,
-    report_url_long: `${base}/r/${link.token}`,
+    report_url: `${base}/r/${withCode.short_code}`,
+    report_url_long: `${base}/r/${withCode.token}`,
   };
 }
 
-export function listStaffReportLinks(origin?: string): StaffReportLink[] {
-  return getState().links.map((l) => enrichLink(l, origin));
+export async function listStaffReportLinks(origin?: string): Promise<StaffReportLink[]> {
+  assertStorageReady();
+  const links = await dbListLinks();
+  return Promise.all(links.map((l) => enrichLink(l, origin)));
 }
 
-/** Cari link by short_code ATAU token panjang */
-export function getLinkByToken(tokenOrCode: string): StaffReportLink | undefined {
-  const key = (tokenOrCode || "").trim().toLowerCase();
-  if (!key) return undefined;
-  const link = getState().links.find(
-    (l) =>
-      l.token === tokenOrCode ||
-      l.token.toLowerCase() === key ||
-      (l.short_code && l.short_code.toLowerCase() === key)
-  );
-  if (link) ensureLinkShortCode(link);
-  return link;
+export async function getLinkByToken(tokenOrCode: string): Promise<StaffReportLink | undefined> {
+  assertStorageReady();
+  const link = await dbGetLinkByToken(tokenOrCode);
+  if (!link) return undefined;
+  return ensureLinkShortCode(link);
 }
 
-export function generateStaffReportLink(
+export async function generateStaffReportLink(
   staffId: string,
   origin?: string
-): { success: true; data: StaffReportLink } | { success: false; error: string } {
-  const staff = findStaff(staffId);
+): Promise<{ success: true; data: StaffReportLink } | { success: false; error: string }> {
+  assertStorageReady();
+  const staff = await findStaff(staffId);
   if (!staff) return { success: false, error: "Staff tidak ditemukan" };
   if (staff.status !== "ACTIVE") return { success: false, error: "Staff tidak aktif" };
 
-  const state = getState();
-  for (const link of state.links) {
-    if (link.staff_id === staffId && link.is_active) {
-      link.is_active = false;
-      link.revoked_at = nowISO();
-    }
-  }
+  await dbRevokeActiveLinksForStaff(staffId, nowISO());
 
-  const short_code = ensureUniqueShortCode(slugifyStaffName(staff.name));
+  const short_code = await ensureUniqueShortCode(slugifyStaffName(staff.name));
   const newLink: StaffReportLink = {
     id: uid("SRL"),
     staff_id: staffId,
@@ -455,33 +308,34 @@ export function generateStaffReportLink(
     created_at: nowISO(),
     revoked_at: null,
   };
-  state.links.push(newLink);
-  return { success: true, data: enrichLink(newLink, origin) };
+  await dbInsertLink(newLink);
+  return { success: true, data: await enrichLink(newLink, origin) };
 }
 
-export function revokeStaffReportLink(
+export async function revokeStaffReportLink(
   linkId: string
-): { success: true; data: StaffReportLink } | { success: false; error: string } {
-  const link = getState().links.find((l) => l.id === linkId);
+): Promise<{ success: true; data: StaffReportLink } | { success: false; error: string }> {
+  assertStorageReady();
+  const links = await dbListLinks();
+  const link = links.find((l) => l.id === linkId);
   if (!link) return { success: false, error: "Link tidak ditemukan" };
   link.is_active = false;
   link.revoked_at = nowISO();
-  return { success: true, data: enrichLink(link) };
+  await dbUpdateLink(link);
+  return { success: true, data: await enrichLink(link) };
 }
 
-function replaceChecklistItems(
+async function replaceChecklistItems(
   templateId: string,
   items: { item_text: string; is_required?: boolean; sort_order?: number }[]
-): void {
-  const state = getState();
-  state.checklistItems = state.checklistItems.filter(
-    (i) => i.report_template_id !== templateId
-  );
+): Promise<void> {
+  await dbDeleteChecklistItemsForTemplate(templateId);
   const created = nowISO();
+  const toInsert: ReportTemplateChecklistItem[] = [];
   items.forEach((item, index) => {
     const text = item.item_text.trim();
     if (!text) return;
-    state.checklistItems.push({
+    toInsert.push({
       id: uid("RTCI"),
       report_template_id: templateId,
       item_text: text,
@@ -490,17 +344,21 @@ function replaceChecklistItems(
       created_at: created,
     });
   });
+  await dbInsertChecklistItems(toInsert);
 }
 
-export function listReportTemplates(): ReportTemplate[] {
-  return [...getState().templates]
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .map(enrichTemplate);
+export async function listReportTemplates(): Promise<ReportTemplate[]> {
+  assertStorageReady();
+  const templates = await dbListTemplates();
+  return Promise.all(
+    [...templates].sort((a, b) => a.sort_order - b.sort_order).map(enrichTemplate)
+  );
 }
 
-export function createReportTemplate(
+export async function createReportTemplate(
   payload: CreateReportTemplatePayload
-): ReportTemplate {
+): Promise<ReportTemplate> {
+  assertStorageReady();
   const template: ReportTemplate = {
     id: uid("RTPL"),
     title: payload.title.trim(),
@@ -521,17 +379,19 @@ export function createReportTemplate(
     sort_order: payload.sort_order ?? 10,
     created_at: nowISO(),
   };
-  getState().templates.push(template);
+  await dbUpsertTemplate(template);
   if (payload.checklist_items?.length) {
-    replaceChecklistItems(template.id, payload.checklist_items);
+    await replaceChecklistItems(template.id, payload.checklist_items);
   }
   return enrichTemplate(template);
 }
 
-export function updateReportTemplate(
+export async function updateReportTemplate(
   payload: UpdateReportTemplatePayload
-): { success: true; data: ReportTemplate } | { success: false; error: string } {
-  const template = getState().templates.find((t) => t.id === payload.id);
+): Promise<{ success: true; data: ReportTemplate } | { success: false; error: string }> {
+  assertStorageReady();
+  const templates = await dbListTemplates();
+  const template = templates.find((t) => t.id === payload.id);
   if (!template) return { success: false, error: "Template tidak ditemukan" };
 
   if (payload.title !== undefined) template.title = payload.title.trim();
@@ -556,26 +416,32 @@ export function updateReportTemplate(
   if (payload.active !== undefined) template.active = payload.active;
   if (payload.sort_order !== undefined) template.sort_order = payload.sort_order;
   if (payload.checklist_items !== undefined) {
-    replaceChecklistItems(template.id, payload.checklist_items);
+    await replaceChecklistItems(template.id, payload.checklist_items);
   }
 
-  return { success: true, data: enrichTemplate(template) };
+  await dbUpsertTemplate(template);
+  return { success: true, data: await enrichTemplate(template) };
 }
 
-function enrichSubmission(sub: DailyReportSubmission): DailyReportSubmission {
-  const answers = getState()
-    .answers.filter((a) => a.submission_id === sub.id)
-    .map((a) => {
-      const item = getState().checklistItems.find((i) => i.id === a.checklist_item_id);
-      return { ...a, item_text: item?.item_text };
-    });
-  const total = answers.length;
-  const checked = answers.filter((a) => a.checked).length;
-  const staff = findStaff(sub.staff_id);
-  const template = getState().templates.find((t) => t.id === sub.report_template_id);
+async function enrichSubmission(
+  sub: DailyReportSubmission,
+  checklistItems: ReportTemplateChecklistItem[],
+  answers: DailyReportChecklistAnswer[],
+  staff?: Staff,
+  template?: ReportTemplate
+): Promise<DailyReportSubmission> {
+  const itemMap = new Map(checklistItems.map((i) => [i.id, i.item_text]));
+  const enrichedAnswers = answers
+    .filter((a) => a.submission_id === sub.id)
+    .map((a) => ({
+      ...a,
+      item_text: itemMap.get(a.checklist_item_id),
+    }));
+  const total = enrichedAnswers.length;
+  const checked = enrichedAnswers.filter((a) => a.checked).length;
   return {
     ...sub,
-    checklist_answers: answers,
+    checklist_answers: enrichedAnswers,
     checklist_total: total,
     checklist_checked: checked,
     checklist_percent: total > 0 ? Math.round((checked / total) * 100) : 0,
@@ -586,14 +452,15 @@ function enrichSubmission(sub: DailyReportSubmission): DailyReportSubmission {
   };
 }
 
-export function getStaffReportByToken(
+export async function getStaffReportByToken(
   token: string
-): { success: true; data: StaffReportLinkContext } | { success: false; error: string } {
+): Promise<{ success: true; data: StaffReportLinkContext } | { success: false; error: string }> {
+  assertStorageReady();
   if (!token || token.trim().length < 2) {
     return { success: false, error: "Token tidak valid" };
   }
 
-  const link = getLinkByToken(token.trim());
+  const link = await getLinkByToken(token.trim());
   if (!link) {
     return { success: false, error: "Link tidak ditemukan. Hubungi atasan Anda." };
   }
@@ -604,16 +471,29 @@ export function getStaffReportByToken(
     };
   }
 
-  const staff = findStaff(link.staff_id);
+  const staff = await findStaff(link.staff_id);
   if (!staff || staff.status !== "ACTIVE") {
     return { success: false, error: "Staff tidak aktif. Hubungi atasan Anda." };
   }
 
-  const templates = matchTemplatesForStaff(staff.outlet, staff.position);
+  const templates = await matchTemplatesForStaff(staff.outlet, staff.position);
   const today = todayISO();
-  const today_submissions = getState()
-    .submissions.filter((s) => s.staff_id === staff.staff_id && s.report_date === today)
-    .map(enrichSubmission);
+  const rawSubs = await dbListSubmissionsForStaffOnDate(staff.staff_id, today);
+  const allItems = await dbListChecklistItems();
+  const allTemplates = await dbListTemplates();
+  const answers = await dbListAnswersForSubmissions(rawSubs.map((s) => s.id));
+
+  const today_submissions = await Promise.all(
+    rawSubs.map((s) =>
+      enrichSubmission(
+        s,
+        allItems.filter((i) => i.report_template_id === s.report_template_id),
+        answers,
+        staff,
+        allTemplates.find((t) => t.id === s.report_template_id)
+      )
+    )
+  );
 
   return {
     success: true,
@@ -641,57 +521,47 @@ function isIssueCondition(c: ReportConditionStatus): boolean {
   return c !== "aman";
 }
 
-export function submitDailyReport(input: {
+export async function submitDailyReport(input: {
   token: string;
   report_template_id: string;
   status_condition: ReportConditionStatus;
   note?: string;
   photo_url?: string | null;
   checklist_answers: { checklist_item_id: string; checked: boolean }[];
-}): { success: true; data: DailyReportSubmission } | { success: false; error: string } {
-  const ctx = getStaffReportByToken(input.token);
+}): Promise<{ success: true; data: DailyReportSubmission } | { success: false; error: string }> {
+  assertStorageReady();
+  const ctx = await getStaffReportByToken(input.token);
   if (!ctx.success) return ctx;
 
-  const { staff, templates } = ctx.data;
+  const { staff: staffCtx, templates } = ctx.data;
+  const staff = await findStaff(staffCtx.staff_id);
+  if (!staff) {
+    return { success: false, error: "Staff tidak aktif. Hubungi atasan Anda." };
+  }
   const template = templates.find((t) => t.id === input.report_template_id);
   if (!template) {
     return { success: false, error: "Kegiatan tidak tersedia untuk staff ini." };
   }
 
-  const items = template.checklist_items || getChecklistItemsForTemplate(template.id);
+  const items = template.checklist_items || (await getChecklistItemsForTemplate(template.id));
   const answerMap = new Map(
     (input.checklist_answers || []).map((a) => [a.checklist_item_id, Boolean(a.checked)])
   );
 
-  // Validate required checklist items belong to this template
   for (const a of input.checklist_answers || []) {
     if (!items.some((i) => i.id === a.checklist_item_id)) {
       return { success: false, error: "Checklist tidak valid untuk kegiatan ini." };
     }
   }
 
-  const missingRequired = items.filter(
-    (i) => i.is_required && !answerMap.get(i.id)
-  );
-  // Allow submit with unchecked items — dashboard shows %, but required items
-  // should ideally be checked. Soft-validate: at least one item must be answered.
   if (items.length > 0 && (input.checklist_answers || []).length === 0) {
     return { success: false, error: "Centang checklist kegiatan terlebih dahulu." };
   }
 
-  // Soft warning: if all required unchecked, still allow but prefer checking
-  void missingRequired;
-
   if (template.requires_photo && !input.photo_url) {
     const today = todayISO();
-    const existing = getState().submissions.find(
-      (s) =>
-        s.staff_id === staff.staff_id &&
-        s.report_template_id === template.id &&
-        s.report_date === today &&
-        s.photo_url
-    );
-    if (!existing) {
+    const existing = await dbFindSubmission(staff.staff_id, template.id, today);
+    if (!existing?.photo_url) {
       return { success: false, error: "Foto wajib untuk kegiatan ini." };
     }
   }
@@ -708,10 +578,7 @@ export function submitDailyReport(input: {
 
   const note = (input.note || "").trim();
   if (template.requires_note && !note) {
-    return {
-      success: false,
-      error: "Catatan wajib diisi untuk kegiatan ini.",
-    };
+    return { success: false, error: "Catatan wajib diisi untuk kegiatan ini." };
   }
   if (isIssueCondition(input.status_condition) && !note) {
     return {
@@ -722,14 +589,7 @@ export function submitDailyReport(input: {
 
   const today = todayISO();
   const submittedAt = nowISO();
-  const state = getState();
-
-  const existing = state.submissions.find(
-    (s) =>
-      s.staff_id === staff.staff_id &&
-      s.report_template_id === template.id &&
-      s.report_date === today
-  );
+  const existing = await dbFindSubmission(staff.staff_id, template.id, today);
 
   let submission: DailyReportSubmission;
 
@@ -742,16 +602,14 @@ export function submitDailyReport(input: {
     existing.outlet = staff.outlet;
     existing.report_title = template.title;
     existing.position = staff.position;
-    // Staff kirim ulang → reset validasi leader (harus dicek ulang)
     existing.leader_validation = null;
     existing.leader_validation_note = null;
     existing.leader_validated_at = null;
     existing.leader_validated_by = null;
     existing.leader_validated_by_name = null;
     existing.leader_validation_photo_url = null;
-    // replace answers
-    state.answers = state.answers.filter((a) => a.submission_id !== existing.id);
     submission = existing;
+    await dbDeleteAnswersForSubmission(existing.id);
   } else {
     submission = {
       id: uid("DRS"),
@@ -769,20 +627,23 @@ export function submitDailyReport(input: {
       report_title: template.title,
       position: staff.position,
     };
-    state.submissions.push(submission);
   }
 
-  for (const item of items) {
-    state.answers.push({
-      id: uid("DRCA"),
-      submission_id: submission.id,
-      checklist_item_id: item.id,
-      checked: Boolean(answerMap.get(item.id)),
-      created_at: submittedAt,
-    });
-  }
+  await dbUpsertSubmission(submission);
 
-  return { success: true, data: enrichSubmission(submission) };
+  const answers: DailyReportChecklistAnswer[] = items.map((item) => ({
+    id: uid("DRCA"),
+    submission_id: submission.id,
+    checklist_item_id: item.id,
+    checked: Boolean(answerMap.get(item.id)),
+    created_at: submittedAt,
+  }));
+  await dbInsertAnswers(answers);
+
+  return {
+    success: true,
+    data: await enrichSubmission(submission, items, answers, staff, template),
+  };
 }
 
 function rowLabel(
@@ -804,15 +665,28 @@ function rowLabel(
   return "selesai_lengkap";
 }
 
-export function buildDailyReportDashboard(
+export async function buildDailyReportDashboard(
   filters: DailyReportFilters = {}
-): DailyReportDashboardData {
+): Promise<DailyReportDashboardData> {
+  assertStorageReady();
   const date = filters.date || todayISO();
-  const staffList = getState().staffCache.filter((s) => s.status === "ACTIVE");
-  const templates = getState().templates.filter((t) => t.active);
-  const submissions = getState()
-    .submissions.filter((s) => s.report_date === date)
-    .map(enrichSubmission);
+  const staffList = (await dbGetStaff()).filter((s) => s.status === "ACTIVE");
+  const templates = (await dbListTemplates()).filter((t) => t.active);
+  const allItems = await dbListChecklistItems();
+  const rawSubs = await dbListSubmissionsByDate(date);
+  const answers = await dbListAnswersForSubmissions(rawSubs.map((s) => s.id));
+
+  const submissions = await Promise.all(
+    rawSubs.map((s) =>
+      enrichSubmission(
+        s,
+        allItems.filter((i) => i.report_template_id === s.report_template_id),
+        answers,
+        staffList.find((st) => st.staff_id === s.staff_id),
+        templates.find((t) => t.id === s.report_template_id)
+      )
+    )
+  );
 
   const rows: DailyReportDashboardRow[] = [];
 
@@ -824,9 +698,8 @@ export function buildDailyReportDashboard(
       continue;
     }
 
-    const matched = matchTemplatesForStaff(staff.outlet, staff.position, templates);
+    const matched = await matchTemplatesForStaff(staff.outlet, staff.position, templates);
     for (const template of matched) {
-      // Skip quick-issue from default required matrix unless filtered
       if (
         filters.report_template_id &&
         filters.report_template_id !== "ALL" &&
@@ -848,11 +721,9 @@ export function buildDailyReportDashboard(
       const checklistTotal =
         submission?.checklist_total ??
         (template.checklist_items?.length ||
-          getChecklistItemsForTemplate(template.id).length);
+          allItems.filter((i) => i.report_template_id === template.id).length);
       const checklistChecked = submission?.checklist_checked ?? 0;
-      const checklistPercent =
-        submission?.checklist_percent ??
-        (checklistTotal > 0 ? 0 : 0);
+      const checklistPercent = submission?.checklist_percent ?? 0;
 
       const label = rowLabel(
         submitted,
@@ -925,35 +796,59 @@ export function buildDailyReportDashboard(
   return { summary, rows, submissions: enrichedSubmissions, missing_required };
 }
 
-export function getSubmissionById(id: string): DailyReportSubmission | null {
-  const sub = getState().submissions.find((s) => s.id === id);
-  return sub ? enrichSubmission(sub) : null;
+export async function getSubmissionById(id: string): Promise<DailyReportSubmission | null> {
+  assertStorageReady();
+  const sub = await dbGetSubmission(id);
+  if (!sub) return null;
+  const items = await dbListChecklistItems(sub.report_template_id);
+  const answers = await dbListAnswersForSubmissions([sub.id]);
+  const staff = await findStaff(sub.staff_id);
+  const templates = await dbListTemplates();
+  return enrichSubmission(
+    sub,
+    items,
+    answers,
+    staff,
+    templates.find((t) => t.id === sub.report_template_id)
+  );
 }
 
-export function listSubmissionsNeedingFix(date?: string): DailyReportSubmission[] {
+export async function listSubmissionsNeedingFix(
+  date?: string
+): Promise<DailyReportSubmission[]> {
+  assertStorageReady();
   const d = date || todayISO();
-  return getState()
-    .submissions.filter((s) => s.report_date === d)
-    .filter(
-      (s) =>
-        s.leader_validation === "revisi" ||
-        s.leader_validation === "tidak_valid" ||
-        s.leader_validation === "manipulasi"
+  const raw = await dbListSubmissionsNeedingFix(d);
+  const allItems = await dbListChecklistItems();
+  const answers = await dbListAnswersForSubmissions(raw.map((s) => s.id));
+  const staffList = await dbGetStaff();
+  const templates = await dbListTemplates();
+  return Promise.all(
+    raw.map((s) =>
+      enrichSubmission(
+        s,
+        allItems.filter((i) => i.report_template_id === s.report_template_id),
+        answers,
+        staffList.find((st) => st.staff_id === s.staff_id),
+        templates.find((t) => t.id === s.report_template_id)
+      )
     )
-    .map(enrichSubmission);
+  );
 }
 
-export function applyLeaderValidation(payload: {
+export async function applyLeaderValidation(payload: {
   submission_id: string;
   validation: import("@/lib/types").StaffReportValidationStatus;
   note?: string;
   leader_id?: string;
   leader_name?: string;
   photo_base64?: string;
-}):
+}): Promise<
   | { success: true; data: DailyReportSubmission }
-  | { success: false; error: string } {
-  const sub = getState().submissions.find((s) => s.id === payload.submission_id);
+  | { success: false; error: string }
+> {
+  assertStorageReady();
+  const sub = await dbGetSubmission(payload.submission_id);
   if (!sub) return { success: false, error: "Laporan staff tidak ditemukan." };
 
   const valid = ["valid", "revisi", "tidak_valid", "manipulasi"];
@@ -968,56 +863,57 @@ export function applyLeaderValidation(payload: {
     };
   }
 
-  sub.leader_validation = payload.validation;
-  sub.leader_validation_note = (payload.note || "").trim() || null;
-  sub.leader_validated_at = nowISO();
-  sub.leader_validated_by = payload.leader_id || "LEADER";
-  sub.leader_validated_by_name = payload.leader_name || "Leader";
-  if (payload.photo_base64) {
-    sub.leader_validation_photo_url = payload.photo_base64;
-  }
+  const updated: DailyReportSubmission = {
+    ...sub,
+    leader_validation: payload.validation,
+    leader_validation_note: (payload.note || "").trim() || null,
+    leader_validated_at: nowISO(),
+    leader_validated_by: payload.leader_id || "LEADER",
+    leader_validated_by_name: payload.leader_name || "Leader",
+    leader_validation_photo_url: payload.photo_base64 || sub.leader_validation_photo_url || null,
+  };
 
-  return { success: true, data: enrichSubmission(sub) };
+  await dbUpdateSubmissionValidation(sub.id, updated);
+  return { success: true, data: (await getSubmissionById(sub.id))! };
 }
 
 /** Upsert semua template dari seed v2 (aman dijalankan ulang). */
-export function seedDailyActivityTemplates(): {
+export async function seedDailyActivityTemplates(): Promise<{
   templates: number;
   codes: string[];
   position_groups: string[];
-} {
-  const state = getState();
+}> {
+  assertStorageReady();
   const built = buildSeed(DAILY_ACTIVITY_SEED_TEMPLATES.map(seedDefFromV2));
   const codes: string[] = [];
   const positionGroups = new Set<string>();
-  const created = nowISO();
 
   for (const tpl of built.templates) {
-    const existing = state.templates.find((t) => t.id === tpl.id);
-    if (existing) {
-      existing.title = tpl.title;
-      existing.category = tpl.category;
-      existing.outlet_id = tpl.outlet_id;
-      existing.position_group = tpl.position_group;
-      existing.standard_result = tpl.standard_result;
-      existing.description = tpl.description;
-      existing.requires_photo = tpl.requires_photo;
-      existing.requires_note = Boolean(tpl.requires_note);
-      existing.is_required_daily = tpl.is_required_daily;
-      existing.kind = tpl.kind;
-      existing.target_time_start = tpl.target_time_start;
-      existing.target_time_end = tpl.target_time_end;
-      existing.active = true;
-      existing.sort_order = tpl.sort_order;
-    } else {
-      state.templates.push({ ...tpl, created_at: created });
-    }
-    // replace checklist items for this template
-    state.checklistItems = state.checklistItems.filter(
-      (c) => c.report_template_id !== tpl.id
-    );
+    const existing = (await dbListTemplates()).find((t) => t.id === tpl.id);
+    const toSave: ReportTemplate = existing
+      ? {
+          ...existing,
+          title: tpl.title,
+          category: tpl.category,
+          outlet_id: tpl.outlet_id,
+          position_group: tpl.position_group,
+          standard_result: tpl.standard_result,
+          description: tpl.description,
+          requires_photo: tpl.requires_photo,
+          requires_note: Boolean(tpl.requires_note),
+          is_required_daily: tpl.is_required_daily,
+          kind: tpl.kind,
+          target_time_start: tpl.target_time_start,
+          target_time_end: tpl.target_time_end,
+          active: true,
+          sort_order: tpl.sort_order,
+        }
+      : tpl;
+
+    await dbUpsertTemplate(toSave);
+    await dbDeleteChecklistItemsForTemplate(tpl.id);
     const items = built.items.filter((i) => i.report_template_id === tpl.id);
-    state.checklistItems.push(...items.map((i) => ({ ...i, created_at: created })));
+    await dbInsertChecklistItems(items);
 
     codes.push(tpl.id);
     if (tpl.position_group) positionGroups.add(tpl.position_group);
@@ -1030,16 +926,16 @@ export function seedDailyActivityTemplates(): {
   };
 }
 
-/** Normalisasi jabatan di staff cache → posisi standar (PA, Kasir, dll). */
-export function normalizeStaffPositionsInCache(staffList?: Staff[]): {
+export async function normalizeStaffPositionsInCache(staffList?: Staff[]): Promise<{
   total: number;
   updated: number;
   unchanged: number;
   unresolved: { staff_id: string; name: string; position: string | null }[];
   updated_staff: Staff[];
-} {
-  if (staffList?.length) setStaffCache(staffList);
-  const cache = getState().staffCache;
+}> {
+  assertStorageReady();
+  if (staffList?.length) await setStaffCache(staffList);
+  const cache = await dbGetStaff();
   let updated = 0;
   let unchanged = 0;
   const unresolved: { staff_id: string; name: string; position: string | null }[] = [];
@@ -1064,6 +960,10 @@ export function normalizeStaffPositionsInCache(staffList?: Staff[]): {
     s.updated_at = nowISO();
     updated += 1;
     updated_staff.push(s);
+  }
+
+  if (updated_staff.length > 0) {
+    await dbUpsertStaff(updated_staff);
   }
 
   return {

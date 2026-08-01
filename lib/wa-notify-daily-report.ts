@@ -22,8 +22,8 @@ export type KendalaNotifyResult = {
   message: string;
 };
 
-export function findLeadersForOutlet(outlet: string): Staff[] {
-  const staff = getStaffCache().filter((s) => s.status === "ACTIVE");
+export async function findLeadersForOutletAsync(outlet: string): Promise<Staff[]> {
+  const staff = (await getStaffCache()).filter((s) => s.status === "ACTIVE");
   const sameOutletLeaders = staff.filter(
     (s) =>
       (s.role === "LEADER" || s.role === "ADMIN") &&
@@ -98,7 +98,7 @@ export async function notifyLeadersOnKendala(input: {
   }
 
   const message = buildKendalaWaMessage(input);
-  const leadersRaw = findLeadersForOutlet(input.outlet);
+  const leadersRaw = await findLeadersForOutletAsync(input.outlet);
   const leaders: LeaderNotifyTarget[] = leadersRaw
     .map((l) => ({
       staff_id: l.staff_id,

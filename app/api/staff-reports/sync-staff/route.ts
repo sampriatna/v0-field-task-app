@@ -1,17 +1,19 @@
 import { NextResponse } from "next/server";
-import { getSession, isAuthenticated } from "@/lib/auth";
 import { setStaffCache } from "@/lib/staff-report-store";
+import {
+  requireDailyActivityAdmin,
+  isSessionPayload,
+} from "@/lib/staff-report-api-auth";
+import { dailyActivityStorageErrorResponse } from "@/lib/staff-report-api-utils";
 import type { Staff } from "@/lib/types";
 
 /**
- * Admin syncs staff list from client (sudah di-fetch) ke store lokal.
+ * Admin syncs staff list from client (sudah di-fetch) ke persistent store.
  * Menghindari menunggu GAS lagi di setiap request dashboard/link.
  */
 export async function POST(request: Request) {
-  const session = await getSession();
-  if (!isAuthenticated(session)) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
-  }
+  const session = await requireDailyActivityAdmin();
+  if (!isSessionPayload(session)) return session;
 
   try {
     const body = await request.json();
@@ -32,11 +34,14 @@ export async function POST(request: Request) {
       .filter((s: Staff) => s.staff_id);
 
     if (staff.length > 0) {
-      setStaffCache(staff);
+      await setStaffCache(staff);
     }
 
     return NextResponse.json({ success: true, data: { count: staff.length } });
-  } catch {
-    return NextResponse.json({ success: false, error: "Invalid body" }, { status: 400 });
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ success: false, error: "Invalid body" }, { status: 400 });
+    }
+    return dailyActivityStorageErrorResponse(error);
   }
 }
