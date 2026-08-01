@@ -483,12 +483,16 @@ export async function submitTaskReport(
   }
 }
 
-export async function getTasks(filters?: TaskFilters): Promise<ApiResponse<Task[]>> {
+export async function getTasks(
+  filters?: TaskFilters,
+  options?: { timeoutMs?: number }
+): Promise<ApiResponse<Task[]>> {
   try {
     const result = await callApi<unknown>(
       "getTasks",
       filters as unknown as Record<string, unknown>,
-      "GET"
+      "GET",
+      options
     );
 
     // GAS not configured → show mock data so app still works without GAS
@@ -920,13 +924,15 @@ export async function generateChecklistReport(templateId: string): Promise<ApiRe
 }
 
 export async function getChecklistReports(
-  filters?: { outlet?: string; status?: string }
+  filters?: { outlet?: string; status?: string },
+  options?: { timeoutMs?: number }
 ): Promise<ApiResponse<ChecklistReport[]>> {
   try {
     const result = await callApi<ChecklistReport[]>(
       "getChecklistReports",
       filters as unknown as Record<string, unknown>,
-      "GET"
+      "GET",
+      options
     );
 
     if (result.error === "GAS_NOT_CONFIGURED") {
