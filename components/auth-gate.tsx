@@ -14,6 +14,7 @@ const PROTECTED_ROUTES = [
   "/checklists/",
   "/checklist-template/",
   "/master/",
+  "/projects",
 ];
 
 const PUBLIC_ROUTES = [
