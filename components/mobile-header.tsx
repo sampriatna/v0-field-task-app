@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Settings, LogOut } from "lucide-react";
+import { ArrowLeft, Settings, LogOut, FolderKanban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -82,6 +82,12 @@ export function MobileHeader({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem asChild>
+                <Link href="/projects" className="flex items-center">
+                  <FolderKanban className="mr-2 h-4 w-4" />
+                  <span>Project</span>
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/settings" className="flex items-center">
                   <Settings className="mr-2 h-4 w-4" />
